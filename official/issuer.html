@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>License CData 生成器 — license-next</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; padding: 20px; }
+  .container { max-width: 720px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .desc { font-size: 13px; color: #666; margin-bottom: 20px; }
+  .field { margin-bottom: 14px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  input, textarea { width: 100%; padding: 8px 10px; border: 1px solid #d0d0d0; border-radius: 4px; font-size: 14px; }
+  textarea { font-family: monospace; resize: vertical; }
+  .hint { font-size: 12px; color: #888; margin-top: 2px; }
+  .row { display: flex; gap: 12px; }
+  .row .field { flex: 1; }
+  button { padding: 10px 24px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; }
+  .btn-primary { background: #1a73e8; color: #fff; }
+  .btn-primary:hover { background: #1557b0; }
+  .btn-primary:disabled { background: #999; cursor: not-allowed; }
+  #result { margin-top: 16px; }
+  #result textarea { background: #f8f9fa; min-height: 80px; }
+  .copy-btn { font-size: 12px; padding: 4px 12px; background: #e8eaed; color: #333; margin-top: 4px; }
+  .copy-btn:hover { background: #d0d4d9; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+  .tag-base64 { background: #e8f5e9; color: #2e7d32; }
+  .tag-ckd { background: #fff3e0; color: #e65100; }
+  .loading { color: #1a73e8; font-size: 13px; margin-top: 8px; }
+  #status { font-size: 12px; margin-bottom: 12px; padding: 6px 10px; border-radius: 4px; }
+  .status-loading { background: #e3f2fd; color: #1565c0; }
+  .status-ready { background: #e8f5e9; color: #2e7d32; }
+  .status-error { background: #ffebee; color: #c62828; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>License CData 生成器</h1>
+  <p class="desc">输入 License 参数和 MasterKey（可选），生成 CData 字符串。结果不经过网络，纯浏览器计算。</p>
+
+  <div id="status" class="status-loading">⏳ 正在加载 WASM 模块...</div>
+
+  <div class="field">
+    <label for="customer">客户名称</label>
+    <input id="customer" value="Acme Corp" placeholder="e.g. Acme Corp">
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label for="expireAt">过期时间</label>
+      <input id="expireAt" type="datetime-local" value="2030-12-31T23:59">
+    </div>
+    <div class="field">
+      <label for="product">产品名</label>
+      <input id="product" value="myapp" placeholder="e.g. myapp">
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="machineID">机器码</label>
+    <input id="machineID" placeholder="客户提供的机器码">
+  </div>
+
+  <div class="field">
+    <label for="features">功能列表（JSON 数组，可选）</label>
+    <input id="features" value='["premium","audit-log"]' placeholder='["premium"]'>
+  </div>
+
+  <div class="field">
+    <label for="masterKey">MasterKey（可选，32 字节字符串）</label>
+    <input id="masterKey" placeholder="留空则使用 base64url 编码">
+    <div class="hint">设置后使用 CKD 派生 CData，留空使用 base64url</div>
+  </div>
+
+  <button id="generateBtn" class="btn-primary" disabled>生成 CData</button>
+
+  <div id="result" style="display:none;">
+    <div class="field">
+      <label id="resultLabel">CData 结果 <span id="methodTag"></span></label>
+      <textarea id="cdataOutput" readonly></textarea>
+      <button id="copyBtn" class="copy-btn">📋 复制</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-top:8px;line-height:1.6;">
+      <p>将该字符串复制到 Worker KV，key 为对应的机器码。</p>
+      <p>客户端通过 <code>GET /v1/query?machine_id=xxx</code> 获取完整的 LicenseSign（含签名）。</p>
+    </div>
+  </div>
+</div>
+
+<script src="wasm_exec.js"></script>
+<script>
+const go = new Go();
+let wasmReady = false;
+
+WebAssembly.instantiateStreaming(fetch('issuer.wasm'), go.importObject)
+  .then(result => {
+    go.run(result.instance);
+    wasmReady = true;
+    document.getElementById('status').className = 'status-ready';
+    document.getElementById('status').textContent = '✅ WASM 已就绪';
+    document.getElementById('generateBtn').disabled = false;
+  })
+  .catch(err => {
+    document.getElementById('status').className = 'status-error';
+    document.getElementById('status').textContent = '❌ WASM 加载失败: ' + err.message;
+  });
+
+document.getElementById('generateBtn').addEventListener('click', function() {
+  if (!wasmReady) return;
+
+  const featuresRaw = document.getElementById('features').value.trim();
+  let features = [];
+  if (featuresRaw) {
+    try { features = JSON.parse(featuresRaw); } catch { features = [featuresRaw]; }
+  }
+
+  const license = {
+    customer: document.getElementById('customer').value.trim(),
+    expire_at: new Date(document.getElementById('expireAt').value).toISOString(),
+    product: document.getElementById('product').value.trim(),
+    machine_id: document.getElementById('machineID').value.trim(),
+    features: features.length > 0 ? features : undefined,
+  };
+
+  const masterKey = document.getElementById('masterKey').value.trim();
+  const cdata = encodeCData(license, masterKey || undefined);
+
+  const methodTag = document.getElementById('methodTag');
+  if (masterKey) {
+    methodTag.innerHTML = '<span class="tag tag-ckd">CKD</span>';
+  } else {
+    methodTag.innerHTML = '<span class="tag tag-base64">base64url</span>';
+  }
+
+  document.getElementById('cdataOutput').value = cdata;
+  document.getElementById('result').style.display = 'block';
+});
+
+document.getElementById('copyBtn').addEventListener('click', function() {
+  const textarea = document.getElementById('cdataOutput');
+  textarea.select();
+  navigator.clipboard.writeText(textarea.value).then(() => {
+    this.textContent = '✅ 已复制';
+    setTimeout(() => { this.textContent = '📋 复制'; }, 2000);
+  });
+});
+</script>
+</body>
+</html>

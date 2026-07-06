@@ -1,0 +1,6 @@
+github.com/denisbrodbeck/machineid v1.0.1 h1:geKr9qtkB876mXguW2X6TU4ZynleN6ezuMSRhl4D7AQ=
+github.com/denisbrodbeck/machineid v1.0.1/go.mod h1:dJUwb7PTidGDeYyUBmXZ2GphQBbjJCrnectwCyxcUSI=
+github.com/doc-war/ckd v1.0.1 h1:0OfRlo62xI9lcVapuvs5YaJP5qs4aLAmzEtoU6nyW3s=
+github.com/doc-war/ckd v1.0.1/go.mod h1:NE/rY4Rbg4GLOPbUD20imi5kpoKlKs08qVLjRg0Xo9o=
+golang.org/x/sys v0.46.0 h1:noSf2Fq6F8DBgS+LysIkx7rIExoNHJsxOAtPp4rthXw=
+golang.org/x/sys v0.46.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=

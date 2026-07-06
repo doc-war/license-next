@@ -1,0 +1,11 @@
+name = "license-issuer"
+main = "index.js"
+compatibility_date = "2026-07-01"
+
+# KV 存储，key=machine_id, value=CData
+[[kv_namespaces]]
+binding = "LICENSES"
+id = ""
+
+# PRIVATE_KEY 通过 wrangler secret put 设置：
+#   wrangler secret put PRIVATE_KEY

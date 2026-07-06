@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>license-next — 轻量级 License 验证框架</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fafafa; color: #333; line-height: 1.7; }
+  .container { max-width: 800px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 28px; margin-bottom: 8px; }
+  .subtitle { font-size: 15px; color: #666; margin-bottom: 32px; }
+  h2 { font-size: 20px; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #1a73e8; }
+  h3 { font-size: 16px; margin: 20px 0 8px; }
+  p { margin: 8px 0; }
+  code, pre { font-family: "SFMono-Regular", Consolas, monospace; font-size: 13px; }
+  pre { background: #f0f0f0; padding: 12px 16px; border-radius: 4px; overflow-x: auto; margin: 8px 0; }
+  code { background: #f0f0f0; padding: 1px 4px; border-radius: 2px; }
+  pre code { background: none; padding: 0; }
+  a { color: #1a73e8; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .btn { display: inline-block; padding: 10px 24px; background: #1a73e8; color: #fff; border-radius: 4px; font-size: 14px; margin: 8px 4px 8px 0; }
+  .btn:hover { background: #1557b0; text-decoration: none; }
+  .btn-outline { background: transparent; border: 1px solid #1a73e8; color: #1a73e8; }
+  .btn-outline:hover { background: #e8f0fe; }
+  .intro { background: #e8f5e9; border-left: 4px solid #2e7d32; padding: 16px 20px; border-radius: 4px; margin: 16px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e0e0e0; font-size: 14px; }
+  th { background: #f5f5f5; font-weight: 600; }
+  .arch { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .arch pre { background: #fafafa; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>license-next</h1>
+  <p class="subtitle">轻量级客户端 License 验证框架 — 将 issuer（服务端）与 checker（客户端）分离</p>
+
+  <a class="btn" href="issuer.html">🧪 在线生成 CData</a>
+  <a class="btn btn-outline" href="https://github.com/doc-war/license-next">GitHub</a>
+
+  <div class="intro">
+    <strong>设计理念：</strong>
+    client 包只依赖验签和 CData 解码；issuer 包独立，只有服务端项目才需要 import。
+    CKD 协议提供无状态、可逆的 License 编码，支持前向兼容。
+  </div>
+
+  <h2>架构</h2>
+  <div class="arch">
+<pre>issuer (服务端)
+  ├─ ECDSA P-256 签名
+  ├─ CKD 派生（可选）
+  └─ → LicenseSign JSON
+
+checker (客户端)
+  ├─ 本地缓存
+  ├─ 签名验证
+  ├─ CData 解码
+  ├─ 到期/机器码校验
+  └─ 远程刷新 → Fallback</pre>
+  </div>
+
+  <h2>快速开始</h2>
+  <h3>1. 生成密钥对</h3>
+<pre>openssl ecparam -genkey -name prime256v1 -out key-private.pem
+openssl ec -in key-private.pem -pubout -out key-public.pem</pre>
+
+  <h3>2. 服务端签发 License</h3>
+<pre>package main
+import "github.com/doc-war/license-next/issuer"
+
+iss, _ := issuer.New(issuer.Config{PrivateKey: privPEM})
+ls, _ := iss.Sign(&issuer.License{
+    Customer:  "Acme Corp",
+    ExpireAt:  time.Date(2030, 12, 31, 23, 59, 59, 0, time.UTC),
+    Product:   "myapp",
+    MachineID: "target-mid",
+    Features:  []string{"premium"},
+})
+// ls.CData / ls.Timestamp / ls.Signature</pre>
+
+  <h3>3. 客户端校验</h3>
+<pre>import licensenext "github.com/doc-war/license-next"
+
+checker, _ := licensenext.New(licensenext.Config{
+    Product:   "myapp",
+    PublicKey: pubPEM,
+    RemoteURL: "https://your-worker.workers.dev/v1/query",
+})
+lic, err := checker.Check(context.Background())</pre>
+
+  <h2>CData 编码</h2>
+  <p>CData 是 License 合同的编码字符串，支持两种方式：</p>
+  <table>
+    <tr><th>方式</th><th>说明</th><th>场景</th></tr>
+    <tr><td>base64url</td><td>JSON 序列化后 URL-safe base64 编码</td><td>无 CKD 需求</td></tr>
+    <tr><td>CKD</td><td>通过 MasterKey 派生的可逆编码，隐藏原始数据</td><td>需要保密 License 内容</td></tr>
+  </table>
+  <p>两种方式对客户端透明：客户端配置 MasterKey 则自动使用 CKD 解码，否则使用 base64url。</p>
+
+  <h2>LicenseSign 结构</h2>
+<pre>{
+  "c_data":    "base64url 或 CKD 编码的 License",
+  "timestamp": 1750000000,
+  "signature": "ECDSA P-256 ASN.1 DER base64 签名",
+  "revoked":   false
+}</pre>
+  <p>签名覆盖 <code>CData + "|" + Timestamp</code>，防止 CData 单独被重放。</p>
+
+  <h2>工具</h2>
+  <ul>
+    <li><a href="issuer.html">在线 CData 生成器</a> — 浏览器内计算 CData，不走网络</li>
+    <li><code>worker/</code> — Cloudflare Worker 模板，对接 KV 存储 + Web Crypto 签名</li>
+    <li><code>cmd/wasm-issuer/</code> — wasip1 目标 WASM 编译（Worker 内签名用）</li>
+  </ul>
+
+  <h2>许可</h2>
+  <p>MIT License</p>
+</div>
+</body>
+</html>

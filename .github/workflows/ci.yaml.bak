@@ -1,0 +1,23 @@
+# CI 工作流 —— 每次推送或 PR 到 main 分支时自动运行
+name: CI
+
+on:
+  push:
+    branches: [main]      # 合入 main 后触发
+  pull_request:
+    branches: [main]      # 他人提交 PR 到 main 时也触发
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        go-version: ["1.21", "1.24", "1.25", "1.26"]   # 覆盖三个 Go 版本
+        os: [ubuntu-latest, windows-latest, macos-latest]  # 覆盖三个 OS
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4                # 拉取代码
+      - uses: actions/setup-go@v5                # 安装指定版本的 Go
+        with:
+          go-version: ${{ matrix.go-version }}
+      - run: go vet ./...                        # 静态检查（编译级）
+      - run: go test -v -race -count=1 ./...     # 跑测试 + 竞争检测
