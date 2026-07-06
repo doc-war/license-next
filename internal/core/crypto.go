@@ -90,16 +90,9 @@ CData 是 CKD 派生后的外部标识，不暴露 License 合同明文。
 CData 字段格式不变，服务端返回相同的 LicenseSign 结构。
 */
 
-// DecodeLicense 将 CData 还原为 License 明文。
-// masterKey 为空 → base64url 解码；masterKey 非空 → CKD Parse 解码。
+// DecodeLicense 使用 CKD 将 CData 还原为 License 明文。
 func DecodeLicense(cdata, masterKey string) (*types.License, error) {
-	var raw []byte
-	var err error
-	if masterKey == "" {
-		raw, err = B64Decode(cdata)
-	} else {
-		raw, err = ckdDecode(cdata, masterKey)
-	}
+	raw, err := ckdDecode(cdata, masterKey)
 	if err != nil {
 		return nil, err
 	}

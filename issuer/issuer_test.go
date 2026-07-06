@@ -13,7 +13,8 @@ import (
 	"github.com/doc-war/license-next/internal/core"
 )
 
-// generateTestKey 生成临时的 ECDSA P-256 密钥对供测试使用
+const testMasterKey = "01234567890123456789012345678901"
+
 func generateTestKey(t *testing.T) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
 	t.Helper()
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -23,7 +24,6 @@ func generateTestKey(t *testing.T) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
 	return priv, &priv.PublicKey
 }
 
-// privateKeyToPEM 将私钥序列化为 SEC1 格式 PEM
 func privateKeyToPEM(t *testing.T, priv *ecdsa.PrivateKey) string {
 	t.Helper()
 	der, err := x509.MarshalECPrivateKey(priv)
@@ -33,28 +33,36 @@ func privateKeyToPEM(t *testing.T, priv *ecdsa.PrivateKey) string {
 	return string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: der}))
 }
 
-// 测试 New：空私钥应报错
 func TestNew_EmptyPrivateKey(t *testing.T) {
-	_, err := New(Config{PrivateKey: ""})
+	_, err := New(Config{PrivateKey: "", MasterKey: testMasterKey})
 	if err == nil {
 		t.Error("expected error for empty private key")
 	}
 }
 
-// 测试 New：无效 PEM 应报错
+func TestNew_EmptyMasterKey(t *testing.T) {
+	privPEM := privateKeyToPEM(t, func() *ecdsa.PrivateKey {
+		priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		return priv
+	}())
+	_, err := New(Config{PrivateKey: privPEM})
+	if err == nil {
+		t.Error("expected error for empty master key")
+	}
+}
+
 func TestNew_InvalidPEM(t *testing.T) {
-	_, err := New(Config{PrivateKey: "invalid-pem"})
+	_, err := New(Config{PrivateKey: "invalid-pem", MasterKey: testMasterKey})
 	if err == nil {
 		t.Error("expected error for invalid PEM")
 	}
 }
 
-// 测试签发与验签：正常流程应通过
 func TestSignAndVerify(t *testing.T) {
 	priv, pub := generateTestKey(t)
 	privPEM := privateKeyToPEM(t, priv)
 
-	iss, err := New(Config{PrivateKey: privPEM})
+	iss, err := New(Config{PrivateKey: privPEM, MasterKey: testMasterKey})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +85,7 @@ func TestSignAndVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	decoded, err := core.DecodeLicense(ls.CData, "")
+	decoded, err := core.DecodeLicense(ls.CData, testMasterKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +97,6 @@ func TestSignAndVerify(t *testing.T) {
 	}
 }
 
-// 测试 CKD 路径：签发与验签通过
 func TestSignAndVerifyWithCKD(t *testing.T) {
 	priv, pub := generateTestKey(t)
 	privPEM := privateKeyToPEM(t, priv)
@@ -121,12 +128,11 @@ func TestSignAndVerifyWithCKD(t *testing.T) {
 	}
 }
 
-// 测试 CData 确定性：相同输入应产生相同 CData（无 CKD 时）
 func TestSignDeterministicCData(t *testing.T) {
 	priv, _ := generateTestKey(t)
 	privPEM := privateKeyToPEM(t, priv)
 
-	iss, err := New(Config{PrivateKey: privPEM})
+	iss, err := New(Config{PrivateKey: privPEM, MasterKey: testMasterKey})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +153,6 @@ func TestSignDeterministicCData(t *testing.T) {
 	}
 }
 
-// 测试 PKCS8 格式私钥也可正常解析
 func TestSignWithPKCS8Key(t *testing.T) {
 	priv, _ := generateTestKey(t)
 	der, err := x509.MarshalPKCS8PrivateKey(priv)
@@ -156,7 +161,7 @@ func TestSignWithPKCS8Key(t *testing.T) {
 	}
 	privPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
 
-	iss, err := New(Config{PrivateKey: privPEM})
+	iss, err := New(Config{PrivateKey: privPEM, MasterKey: testMasterKey})
 	if err != nil {
 		t.Fatal(err)
 	}

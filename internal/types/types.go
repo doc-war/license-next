@@ -6,11 +6,13 @@ import "time"
 
 // License 授权合同明文，由服务端签发时序列化到 CData 中
 type License struct {
-	Customer  string    `json:"customer"`            // 客户名
-	ExpireAt  time.Time `json:"expire_at"`            // 过期时间
-	Product   string    `json:"product"`              // 产品名
-	Features  []string  `json:"features,omitempty"`   // 功能列表（可选）
-	MachineID string    `json:"machine_id"`           // 绑定的机器码
+	Customer         string    `json:"customer"`                    // 客户标识（机器码匹配依据）
+	CustomerNickname string    `json:"customer_nickname,omitempty"` // 客户昵称（仅前台反显）
+	CustomerEmail    string    `json:"customer_email,omitempty"`    // 客户邮箱（仅前台反显）
+	ExpireAt         time.Time `json:"expire_at"`                    // 过期时间
+	Product          string    `json:"product"`                      // 产品名
+	Features         []string  `json:"features,omitempty"`           // 功能列表（可选）
+	MachineID        string    `json:"machine_id"`                   // 绑定的机器码
 }
 
 // LicenseSign 服务端返回的完整签名结构

@@ -25,9 +25,7 @@
   #result textarea { background: #f8f9fa; min-height: 80px; }
   .copy-btn { font-size: 12px; padding: 4px 12px; background: #e8eaed; color: #333; margin-top: 4px; }
   .copy-btn:hover { background: #d0d4d9; }
-  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
-  .tag-base64 { background: #e8f5e9; color: #2e7d32; }
-  .tag-ckd { background: #fff3e0; color: #e65100; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; background: #fff3e0; color: #e65100; }
   .loading { color: #1a73e8; font-size: 13px; margin-top: 8px; }
   #status { font-size: 12px; margin-bottom: 12px; padding: 6px 10px; border-radius: 4px; }
   .status-loading { background: #e3f2fd; color: #1565c0; }
@@ -38,13 +36,24 @@
 <body>
 <div class="container">
   <h1>License CData 生成器</h1>
-  <p class="desc">输入 License 参数和 MasterKey（可选），生成 CData 字符串。结果不经过网络，纯浏览器计算。</p>
+  <p class="desc">输入 License 参数和 MasterKey，生成 CKD 编码的 CData 字符串。结果不经过网络，纯浏览器计算。</p>
 
   <div id="status" class="status-loading">⏳ 正在加载 WASM 模块...</div>
 
   <div class="field">
-    <label for="customer">客户名称</label>
-    <input id="customer" value="Acme Corp" placeholder="e.g. Acme Corp">
+    <label for="customer">客户标识（machine_id 匹配依据）</label>
+    <input id="customer" value="acme-001" placeholder="e.g. acme-001">
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label for="customerNickname">客户昵称（前台反显）</label>
+      <input id="customerNickname" value="Acme Corp" placeholder="e.g. Acme Corp">
+    </div>
+    <div class="field">
+      <label for="customerEmail">客户邮箱（前台反显）</label>
+      <input id="customerEmail" value="admin@acme.com" placeholder="e.g. admin@acme.com">
+    </div>
   </div>
 
   <div class="row">
@@ -69,9 +78,9 @@
   </div>
 
   <div class="field">
-    <label for="masterKey">MasterKey（可选，32 字节字符串）</label>
-    <input id="masterKey" placeholder="留空则使用 base64url 编码">
-    <div class="hint">设置后使用 CKD 派生 CData，留空使用 base64url</div>
+    <label for="masterKey">MasterKey（32 字节字符串）</label>
+    <input id="masterKey" placeholder="必填，输入 CKD MasterKey" required>
+    <div class="hint">CKD 派生密钥，客户端配置相同的 MasterKey 才能解码</div>
   </div>
 
   <button id="generateBtn" class="btn-primary" disabled>生成 CData</button>
@@ -110,6 +119,13 @@ WebAssembly.instantiateStreaming(fetch('issuer.wasm'), go.importObject)
 document.getElementById('generateBtn').addEventListener('click', function() {
   if (!wasmReady) return;
 
+  const masterKey = document.getElementById('masterKey').value.trim();
+  if (!masterKey) {
+    document.getElementById('cdataOutput').value = '错误: MasterKey 不能为空';
+    document.getElementById('result').style.display = 'block';
+    return;
+  }
+
   const featuresRaw = document.getElementById('features').value.trim();
   let features = [];
   if (featuresRaw) {
@@ -118,22 +134,17 @@ document.getElementById('generateBtn').addEventListener('click', function() {
 
   const license = {
     customer: document.getElementById('customer').value.trim(),
+    customer_nickname: document.getElementById('customerNickname').value.trim() || undefined,
+    customer_email: document.getElementById('customerEmail').value.trim() || undefined,
     expire_at: new Date(document.getElementById('expireAt').value).toISOString(),
     product: document.getElementById('product').value.trim(),
     machine_id: document.getElementById('machineID').value.trim(),
     features: features.length > 0 ? features : undefined,
   };
 
-  const masterKey = document.getElementById('masterKey').value.trim();
-  const cdata = encodeCData(license, masterKey || undefined);
+  const cdata = encodeCData(license, masterKey);
 
-  const methodTag = document.getElementById('methodTag');
-  if (masterKey) {
-    methodTag.innerHTML = '<span class="tag tag-ckd">CKD</span>';
-  } else {
-    methodTag.innerHTML = '<span class="tag tag-base64">base64url</span>';
-  }
-
+  document.getElementById('methodTag').innerHTML = '<span class="tag tag-ckd">CKD</span>';
   document.getElementById('cdataOutput').value = cdata;
   document.getElementById('result').style.display = 'block';
 });

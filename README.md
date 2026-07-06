@@ -36,20 +36,29 @@
 
 ### CData — License 编码字符串
 
-CData 是 License 合同明文经过编码后的字符串，支持两种方式：
+CData 是 License 合同明文经过 CKD 协议编码后的字符串，使用 MasterKey 派生，可逆、无状态、不暴露明文。
 
-| 方式 | 说明 | 场景 |
-|---|---|---|
-| **base64url** | JSON 序列化后 URL-safe base64 编码 | 无保密需求 |
-| **CKD** | 通过 MasterKey 派生，可逆、无状态、不暴露明文 | 需要隐藏 License 内容 |
+客户端配置相同的 MasterKey，通过 CKD.Parse 即可解码还原 License。
 
-两种方式对客户端**透明**：配置 `MasterKey` 则自动使用 CKD 解码，否则使用 base64url。
+### License — 授权合同
+
+```go
+type License struct {
+    Customer         string    // 客户标识（机器码匹配依据）
+    CustomerNickname string    // 客户昵称（仅前台反显，可选）
+    CustomerEmail    string    // 客户邮箱（仅前台反显，可选）
+    ExpireAt         time.Time // 过期时间
+    Product          string    // 产品名
+    Features         []string  // 功能列表（可选）
+    MachineID        string    // 绑定的机器码
+}
+```
 
 ### LicenseSign — 签名结构
 
 ```json
 {
-  "c_data":    "base64url 或 CKD 编码的 License",
+  "c_data":    "CKD 编码的 License",
   "timestamp": 1750000000,
   "signature": "ECDSA P-256 ASN.1 DER base64 签名",
   "revoked":   false
@@ -83,7 +92,7 @@ openssl ec -in key-private.pem -pubout -out key-public.pem
 
 ### 2. 生成 CData（License 编码字符串）
 
-打开 `official/issuer.html`（浏览器），输入 License 参数和可选的 MasterKey，点击生成。
+打开 `official/issuer.html`（浏览器），输入 License 参数和 MasterKey，点击生成。
 
 或者用 CLI：
 
@@ -92,13 +101,18 @@ package main
 
 import "github.com/doc-war/license-next/issuer"
 
-iss, _ := issuer.New(issuer.Config{PrivateKey: privPEM})
+iss, _ := issuer.New(issuer.Config{
+    PrivateKey: privPEM,
+    MasterKey:  masterKey,
+})
 ls, _ := iss.Sign(&issuer.License{
-    Customer:  "Acme Corp",
-    ExpireAt:  time.Date(2030, 12, 31, 23, 59, 59, 0, time.UTC),
-    Product:   "myapp",
-    MachineID: "target-machine-id",
-    Features:  []string{"premium", "audit-log"},
+    Customer:         "acme-001",
+    CustomerNickname: "Acme Corp",
+    CustomerEmail:    "admin@acme.com",
+    ExpireAt:         time.Date(2030, 12, 31, 23, 59, 59, 0, time.UTC),
+    Product:          "myapp",
+    MachineID:        "target-machine-id",
+    Features:         []string{"premium", "audit-log"},
 })
 // ls.CData 就是 License 编码字符串
 ```
@@ -123,6 +137,7 @@ import licensenext "github.com/doc-war/license-next"
 checker, err := licensenext.New(licensenext.Config{
     Product:   "myapp",
     PublicKey: pubPEM,
+    MasterKey: masterKey,
     RemoteURL: "https://your-worker.workers.dev/v1/query",
 })
 if err != nil {
@@ -134,7 +149,7 @@ if err != nil {
     log.Fatalf("license校验失败: %v", err)
 }
 
-log.Printf("欢迎 %s，有效期至 %s", lic.Customer, lic.ExpireAt.Format("2006-01-02"))
+log.Printf("欢迎 %s，有效期至 %s", lic.CustomerNickname, lic.ExpireAt.Format("2006-01-02"))
 log.Printf("可用功能: %v", lic.Features)
 ```
 
@@ -145,7 +160,7 @@ log.Printf("可用功能: %v", lic.Features)
 | `Product string` | 必填 | 产品名，用于隔离本地存储目录 |
 | `PublicKey string` | 必填 | ECC 公钥 PEM |
 | `RemoteURL string` | `""` | license 查询 API 地址 |
-| `MasterKey string` | `""` | CKD 主密钥，为空则 CData 使用 base64url |
+| `MasterKey string` | 必填 | CKD 主密钥 |
 | `StorageDir string` | `~/.license-next/{product}/` | 本地存储根目录 |
 | `FreshWindow time.Duration` | 7 天 | 新鲜度窗口 |
 | `RefreshInterval time.Duration` | 3 天 | 异步预刷新节流间隔 |

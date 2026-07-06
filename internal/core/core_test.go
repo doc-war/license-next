@@ -170,13 +170,14 @@ func TestVerifySignature_WrongKey(t *testing.T) {
 	}
 }
 
-// 测试 CData 解码：正常 base64url 输入应还原 License
+// 测试 CData 解码：正常 CKD 输入应还原 License
 func TestDecodeLicense(t *testing.T) {
+	masterKey := "01234567890123456789012345678901"
 	lic := &types.License{Customer: "test", ExpireAt: time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC), Product: "test-product", MachineID: "test-machine"}
 	raw, _ := json.Marshal(lic)
-	cdata := B64Encode(raw)
+	cdata := mustDerive(t, raw, masterKey)
 
-	decoded, err := DecodeLicense(cdata, "")
+	decoded, err := DecodeLicense(cdata, masterKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,18 +189,36 @@ func TestDecodeLicense(t *testing.T) {
 	}
 }
 
-// 测试 CData 解码：无效 base64 应报错
-func TestDecodeLicense_InvalidBase64(t *testing.T) {
-	_, err := DecodeLicense("!!!invalid-base64!!!", "")
+func mustDerive(t *testing.T, raw []byte, masterKey string) string {
+	t.Helper()
+	c, err := ckd.New(ckd.Config{
+		CurrentVersion: 1,
+		SecretsByVersion: map[uint8][]byte{1: []byte(masterKey)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cdata, err := c.Derive(raw, "license")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cdata
+}
+
+// 测试 CData 解码：无效字符串应报错
+func TestDecodeLicense_InvalidCData(t *testing.T) {
+	masterKey := "01234567890123456789012345678901"
+	_, err := DecodeLicense("!!!invalid-cdata!!!", masterKey)
 	if err == nil {
-		t.Error("expected error for invalid base64")
+		t.Error("expected error for invalid cdata")
 	}
 }
 
 // 测试 CData 解码：无效 JSON 应报错
 func TestDecodeLicense_InvalidJSON(t *testing.T) {
-	cdata := B64Encode([]byte("{invalid json}"))
-	_, err := DecodeLicense(cdata, "")
+	masterKey := "01234567890123456789012345678901"
+	cdata := mustDerive(t, []byte("{invalid json}"), masterKey)
+	_, err := DecodeLicense(cdata, masterKey)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
 	}
@@ -498,7 +517,7 @@ func TestRemote_Fetch_InvalidJSON(t *testing.T) {
 
 // 测试 CData 解码：空字符串应报错
 func TestDecodeLicense_EmptyCData(t *testing.T) {
-	_, err := DecodeLicense("", "")
+	_, err := DecodeLicense("", "01234567890123456789012345678901")
 	if err == nil {
 		t.Error("expected error for empty cdata")
 	}

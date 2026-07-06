@@ -1,5 +1,5 @@
 // Package main 端到端全流程演示：
-// 加载密钥 → 签发 License → 验签 → 解码 → 篡改检测 → CKD 路径测试
+// 加载密钥 → 签发 License → 验签 → 解码 → 篡改检测 → CKD 确定性测试
 package main
 
 import (
@@ -20,15 +20,14 @@ import (
 )
 
 const dataDir = "examples/full/testdata"
+const testMasterKey = "01234567890123456789012345678901"
 
 var ErrBadSignature = fmt.Errorf("签名验证失败")
 
-// ecdsaSignature 用于 ASN.1 反序列化签名
 type ecdsaSignature struct {
 	R, S *big.Int
 }
 
-// verifySignature 演示手动验签流程（与 internal/core 逻辑一致）
 func verifySignature(pub *ecdsa.PublicKey, cdata string, timestamp int64, signature string) error {
 	payload := fmt.Sprintf("%s|%d", cdata, timestamp)
 	hash := sha256.Sum256([]byte(payload))
@@ -47,7 +46,6 @@ func verifySignature(pub *ecdsa.PublicKey, cdata string, timestamp int64, signat
 	return nil
 }
 
-// loadPublicKey 从 PEM 文件加载 ECDSA 公钥
 func loadPublicKey(path string) (*ecdsa.PublicKey, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -66,6 +64,10 @@ func loadPublicKey(path string) (*ecdsa.PublicKey, error) {
 
 func main() {
 	masterKey := os.Getenv("CKD_MASTER_KEY")
+	if masterKey == "" {
+		masterKey = testMasterKey
+		fmt.Printf("  使用测试 MasterKey: %s\n", masterKey)
+	}
 
 	fmt.Println("========================================")
 	fmt.Println("  license-next 全流程测试")
@@ -92,7 +94,6 @@ func main() {
 	// ---- 2. 签发 License ----
 	fmt.Println("\n[2/6] 签发License...")
 
-	// 初始化签发器
 	iss, err := issuer.New(issuer.Config{
 		PrivateKey: string(privPEM),
 		MasterKey:  masterKey,
@@ -101,7 +102,6 @@ func main() {
 		panic(err)
 	}
 
-	// 构造并签发 License
 	lic := &issuer.License{
 		Customer:  "Acme Corp",
 		ExpireAt:  time.Date(2030, 12, 31, 23, 59, 59, 0, time.UTC),
@@ -129,44 +129,29 @@ func main() {
 
 	// ---- 4. 解码 CData ----
 	fmt.Println("\n[4/6] 解码CData还原License...")
-	if masterKey == "" {
-		// 未启用 CKD，直接 base64url 解码
-		raw, err := base64.URLEncoding.DecodeString(ls.CData)
-		if err != nil {
-			fmt.Printf("  ❌ 解码失败: %v\n", err)
-		} else {
-			var decoded issuer.License
-			json.Unmarshal(raw, &decoded)
-			decJSON, _ := json.MarshalIndent(decoded, "  ", "  ")
-			fmt.Printf("  还原 License:\n  %s\n", decJSON)
-		}
+	c, _ := ckd.New(ckd.Config{
+		CurrentVersion: 1,
+		SecretsByVersion: map[uint8][]byte{1: []byte(masterKey)},
+	})
+	raw, err := c.Parse(ls.CData, "license")
+	if err != nil {
+		fmt.Printf("  ❌ CKD解析失败: %v\n", err)
 	} else {
-		// 启用 CKD，使用 CKD.Parse 还原
-		c, _ := ckd.New(ckd.Config{
-			CurrentVersion: 1,
-			SecretsByVersion: map[uint8][]byte{1: []byte(masterKey)},
-		})
-		raw, err := c.Parse(ls.CData, "license")
-		if err != nil {
-			fmt.Printf("  ❌ CKD解析失败: %v\n", err)
-		} else {
-			var decoded issuer.License
-			json.Unmarshal(raw, &decoded)
-			decJSON, _ := json.MarshalIndent(decoded, "  ", "  ")
-			fmt.Printf("  CKD解析还原 License:\n  %s\n", decJSON)
-		}
+		var decoded issuer.License
+		json.Unmarshal(raw, &decoded)
+		decJSON, _ := json.MarshalIndent(decoded, "  ", "  ")
+		fmt.Printf("  CKD解析还原 License:\n  %s\n", decJSON)
 	}
 
 	// ---- 5. 篡改检测 ----
 	fmt.Println("\n[5/6] 篡改检测...")
 
-	// 构造 4 个篡改场景，全部应被验签拒绝
 	tests := []struct {
 		name string
 		fn   func() error
 	}{
 		{"篡改CData", func() error {
-			cp := *ls; cp.CData = base64.URLEncoding.EncodeToString([]byte(`{"customer":"evil"}`))
+			cp := *ls; cp.CData = "AAAAAAAA"
 			return verifySignature(pub, cp.CData, cp.Timestamp, cp.Signature)
 		}},
 		{"篡改Timestamp", func() error {
@@ -189,22 +174,13 @@ func main() {
 		}
 	}
 
-	// ---- 6. CKD 路径 ----
-	fmt.Println("\n[6/6] CKD派生路径...")
-	if masterKey == "" {
-		fmt.Println("  跳过（未设置 CKD_MASTER_KEY）")
-		fmt.Println("\n  测试CKD路径:")
-		fmt.Println("    $env:CKD_MASTER_KEY='01234567890123456789012345678901'")
-		fmt.Println("    go run examples/full/main.go")
+	// ---- 6. CKD 确定性 ----
+	fmt.Println("\n[6/6] CKD确定性...")
+	ls2, _ := iss.Sign(lic)
+	if ls.CData == ls2.CData {
+		fmt.Println("  ✅ 相同输入 → 相同CData")
 	} else {
-		fmt.Println("  ✅ 已全程使用CKD派生+解析")
-		// 验证 CKD 确定性：相同输入产生相同 CData
-		ls2, _ := iss.Sign(lic)
-		if ls.CData == ls2.CData {
-			fmt.Println("  ✅ CKD确定性: 相同输入 → 相同CData")
-		} else {
-			fmt.Println("  ❌ CKD异常: 相同输入 → 不同CData")
-		}
+		fmt.Println("  ❌ 异常: 相同输入 → 不同CData")
 	}
 
 	fmt.Println("\n========================================")

@@ -39,7 +39,7 @@ type Checker struct {
 	product         string            // 产品名，用于 CheckProduct
 	machineID       string            // 本地机器码，在 New 时自动获取
 	pubKey          *ecdsa.PublicKey  // 解析后的 ECC 公钥
-	masterKey       string            // CKD MasterKey，为空则使用 base64url
+	masterKey       string            // CKD MasterKey
 	remoteURL       string            // 远端校验接口地址（可选）
 	storeDir        string            // 本地缓存目录
 	freshWindow     time.Duration     // 签名新鲜度窗口
@@ -52,7 +52,7 @@ type Checker struct {
 type Config struct {
 	Product   string // 必填，产品名
 	PublicKey string // 必填，PEM 格式的 ECC 公钥
-	MasterKey string // 选填，CKD MasterKey，为空则 CData 使用 base64url
+	MasterKey string // 必填，CKD MasterKey
 	RemoteURL string // 选填，远端 License 查询接口
 
 	StorageDir      string        // 选填，缓存目录（默认 ~/.license-next/<product>）
@@ -68,6 +68,9 @@ func applyDefaults(cfg *Config) error {
 	}
 	if cfg.PublicKey == "" {
 		return errors.New("licensenext: PublicKey 不能为空")
+	}
+	if cfg.MasterKey == "" {
+		return errors.New("licensenext: MasterKey 不能为空")
 	}
 	if cfg.StorageDir == "" {
 		home, err := os.UserHomeDir()
@@ -150,6 +153,12 @@ func (c *Checker) Check(ctx context.Context) (*License, error) {
 
 // checkLocal 从本地缓存读取 LicenseSign，执行全部校验
 // 返回校验结果 + License（可能部分） + 错误
+// SimpleCheck 直接解码 CData 并还原 License，不涉及签名验证、联网、缓存。
+// 适用于客户端只需读取 License 内字段（昵称、邮箱、功能列表）做前台反显的场景。
+func (c *Checker) SimpleCheck(cdata string) (*License, error) {
+	return core.DecodeLicense(cdata, c.masterKey)
+}
+
 func (c *Checker) checkLocal() (CheckResult, *License, error) {
 	ls, err := core.LoadLicense(c.storeDir)
 	if err != nil {

@@ -29,7 +29,7 @@ type LicenseSign = types.LicenseSign
 // Config 签发端配置
 type Config struct {
 	PrivateKey string // 必填，PEM 格式的 ECC 私钥（支持 SEC1 和 PKCS8）
-	MasterKey  string // 选填，CKD MasterKey，为空则 CData 使用 base64url
+	MasterKey  string // 必填，CKD MasterKey
 }
 
 // Issuer 签发器，持有私钥和可选的 CKD 实例
@@ -43,10 +43,13 @@ type ecdsaSignature struct {
 	R, S *big.Int
 }
 
-// New 创建 Issuer，解析私钥并初始化 CKD（若配置了 MasterKey）
+// New 创建 Issuer，解析私钥并初始化 CKD
 func New(cfg Config) (*Issuer, error) {
 	if cfg.PrivateKey == "" {
 		return nil, errors.New("issuer: PrivateKey 不能为空")
+	}
+	if cfg.MasterKey == "" {
+		return nil, errors.New("issuer: MasterKey 不能为空")
 	}
 
 	priv, err := parsePrivateKey(cfg.PrivateKey)
@@ -54,22 +57,17 @@ func New(cfg Config) (*Issuer, error) {
 		return nil, err
 	}
 
-	iss := &Issuer{privateKey: priv}
-
-	if cfg.MasterKey != "" {
-		c, err := ckd.New(ckd.Config{
-			CurrentVersion: 1,
-			SecretsByVersion: map[uint8][]byte{
-				1: []byte(cfg.MasterKey),
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("issuer: CKD初始化失败: %w", err)
-		}
-		iss.ckd = c
+	c, err := ckd.New(ckd.Config{
+		CurrentVersion: 1,
+		SecretsByVersion: map[uint8][]byte{
+			1: []byte(cfg.MasterKey),
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("issuer: CKD初始化失败: %w", err)
 	}
 
-	return iss, nil
+	return &Issuer{privateKey: priv, ckd: c}, nil
 }
 
 // parsePrivateKey 解析 PEM 格式的 ECDSA 私钥。
@@ -105,7 +103,7 @@ func parsePrivateKey(pemStr string) (*ecdsa.PrivateKey, error) {
 
 // Sign 对 License 进行签名。
 // 1. 序列化 License 为 JSON
-// 2. 生成 CData（base64url 或 CKD Derive）
+// 2. 使用 CKD Derive 生成 CData
 // 3. 计算 SHA256(CData + "|" + Timestamp) 并用 ECDSA 签名
 // 4. 返回 LicenseSign
 func (iss *Issuer) Sign(lic *License) (*LicenseSign, error) {
@@ -114,15 +112,9 @@ func (iss *Issuer) Sign(lic *License) (*LicenseSign, error) {
 		return nil, fmt.Errorf("issuer: License序列化失败: %w", err)
 	}
 
-	// 生成 CData
-	var cdata string
-	if iss.ckd != nil {
-		cdata, err = iss.ckd.Derive(raw, "license")
-		if err != nil {
-			return nil, fmt.Errorf("issuer: CKD派生失败: %w", err)
-		}
-	} else {
-		cdata = base64.URLEncoding.EncodeToString(raw)
+	cdata, err := iss.ckd.Derive(raw, "license")
+	if err != nil {
+		return nil, fmt.Errorf("issuer: CKD派生失败: %w", err)
 	}
 
 	// 签名

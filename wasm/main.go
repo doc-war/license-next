@@ -7,7 +7,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"syscall/js"
 
@@ -21,8 +20,13 @@ func main() {
 }
 
 func encodeCData(this js.Value, args []js.Value) any {
-	if len(args) < 1 {
-		return "参数不足，需要传入 License 对象"
+	if len(args) < 2 {
+		return "参数不足，需要传入 License 对象和 MasterKey"
+	}
+
+	masterKey := args[1].String()
+	if masterKey == "" {
+		return "MasterKey 不能为空"
 	}
 
 	jsonStr := js.Global().Get("JSON").Call("stringify", args[0]).String()
@@ -34,15 +38,6 @@ func encodeCData(this js.Value, args []js.Value) any {
 	raw, err := json.Marshal(lic)
 	if err != nil {
 		return "序列化失败: " + err.Error()
-	}
-
-	masterKey := ""
-	if len(args) > 1 {
-		masterKey = args[1].String()
-	}
-
-	if masterKey == "" {
-		return base64.URLEncoding.EncodeToString(raw)
 	}
 
 	c, err := ckd.New(ckd.Config{
