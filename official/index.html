@@ -3,119 +3,628 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>license-next — 轻量级 License 验证框架</title>
+<title>license-next · 下一代 License 签发与验证框架</title>
+<meta name="description" content="license-next 是一个轻量级客户端 License 验证框架，将 issuer（服务端签发）与 checker（客户端校验）分离，支持纯离线签名与在线刷新签名两种业务形态。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="license-next · 下一代 License 签发与验证框架">
+<meta property="og:description" content="轻量级客户端 License 验证框架，issuer 与 checker 分离，支持离线签名与在线吊销刷新，MIT 开源。">
+<meta property="og:url" content="https://github.com/doc-war/license-next">
+<meta property="og:site_name" content="license-next">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="license-next · 下一代 License 签发与验证框架">
+<meta name="twitter:description" content="轻量级客户端 License 验证框架，issuer 与 checker 分离，支持离线签名与在线吊销刷新，MIT 开源。">
+<script src="/analytics.js" defer></script><!-- 引入统计代码 -->
+<link rel="icon" href="/img/favicon.ico" type="image/x-icon"><!-- 引入官网ico -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  "name": "license-next",
+  "description": "轻量级客户端 License 验证框架，使用 CKD 可逆加密和 ECDSA 非对称签名双安全机制，支持纯离线签名与在线刷新签名两种业务形态。",
+  "programmingLanguage": [
+    "Go",
+    "WebAssembly"
+  ],
+  "runtimePlatform": [
+    "Linux",
+    "Windows",
+    "macOS",
+    "WebAssembly Runtime"
+  ],
+  "codeRepository": "https://github.com/doc-war/license-next",
+  "license": "https://opensource.org/licenses/MIT",
+  "applicationCategory": "DeveloperApplication",
+  "author": {
+    "@type": "Organization",
+    "name": "doc-war",
+    "url": "https://doc-war.com",
+    "jobTitle": "产品经理 | 全栈架构师 | 文档工程师",
+    "description": "zhaoliwei，网名越石父，花名青樵，月光博客早期知名评论员，曾以提供判断力价值的评论风格而闻名。主张设计驱动，注重文档驱动，专注于基础协议和基础工具研发。"
+  },
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "softwareRequirements": [
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "CKD",
+      "description": "CKD（Channel Key Derivation）可逆密钥派生与加密框架，为 License 数据提供对称加密能力。"
+      "codeRepository": "https://github.com/doc-war/ckd",
+      "programmingLanguage": [
+        "Go"
+      ],
+      "license": "https://opensource.org/licenses/MIT"
+    }
+  ]
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700;900&family=Noto+Sans+SC:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fafafa; color: #333; line-height: 1.7; }
-  .container { max-width: 800px; margin: 0 auto; padding: 40px 20px 80px; }
-  h1 { font-size: 28px; margin-bottom: 8px; }
-  .subtitle { font-size: 15px; color: #666; margin-bottom: 32px; }
-  h2 { font-size: 20px; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #1a73e8; }
-  h3 { font-size: 16px; margin: 20px 0 8px; }
-  p { margin: 8px 0; }
-  code, pre { font-family: "SFMono-Regular", Consolas, monospace; font-size: 13px; }
-  pre { background: #f0f0f0; padding: 12px 16px; border-radius: 4px; overflow-x: auto; margin: 8px 0; }
-  code { background: #f0f0f0; padding: 1px 4px; border-radius: 2px; }
-  pre code { background: none; padding: 0; }
-  a { color: #1a73e8; text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .btn { display: inline-block; padding: 10px 24px; background: #1a73e8; color: #fff; border-radius: 4px; font-size: 14px; margin: 8px 4px 8px 0; }
-  .btn:hover { background: #1557b0; text-decoration: none; }
-  .btn-outline { background: transparent; border: 1px solid #1a73e8; color: #1a73e8; }
-  .btn-outline:hover { background: #e8f0fe; }
-  .intro { background: #e8f5e9; border-left: 4px solid #2e7d32; padding: 16px 20px; border-radius: 4px; margin: 16px 0; }
-  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e0e0e0; font-size: 14px; }
-  th { background: #f5f5f5; font-weight: 600; }
-  .arch { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 16px 0; }
-  .arch pre { background: #fafafa; }
+  :root{
+    --ink:#11161a;
+    --ink-2:#1a2126;
+    --ink-3:#222b31;
+    --paper:#ece7d9;
+    --paper-dim:#d9d3c1;
+    --seal:#3f7a94;
+    --seal-bright:#5fa3bd;
+    --stamp-red:#a6432f;
+    --line:#2b353c;
+    --ink-soft:#8fa0a8;
+    --ink-faint:#5c6c73;
+    --radius: 3px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--ink);
+    color:#dfe6e8;
+    font-family:'Noto Sans SC', sans-serif;
+    line-height:1.7;
+    font-size:16px;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.serif{ font-family:'Noto Serif SC', serif; }
+  code, .mono, .mono *{ font-family:'IBM Plex Mono', monospace; }
+  a{ color:inherit; text-decoration:none; }
+  .wrap{ max-width:1080px; margin:0 auto; padding:0 32px; }
+  ::selection{ background:var(--seal); color:#fff; }
+
+  /* ---------- NAV ---------- */
+  nav{
+    position:fixed; top:0; left:0; right:0; z-index:50;
+    background:rgba(17,22,26,0.86);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  nav .wrap{ display:flex; align-items:center; justify-content:space-between; height:64px; }
+  .brand{ display:flex; align-items:center; gap:10px; font-weight:600; letter-spacing:.02em; }
+  .brand-mark{
+    width:22px; height:22px; border-radius:50%;
+    border:1.5px solid var(--seal-bright);
+    position:relative; flex:none;
+  }
+  .brand-mark::after{
+    content:""; position:absolute; inset:5px;
+    border-radius:50%; background:var(--seal-bright); opacity:.6;
+  }
+  .navlinks{ display:flex; gap:28px; font-size:14px; color:var(--ink-soft); }
+  .navlinks a:hover{ color:#fff; }
+  .nav-cta{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:8px 16px; font-size:13.5px; font-family:'IBM Plex Mono',monospace;
+    border:1px solid var(--seal-bright); color:var(--seal-bright);
+    border-radius:var(--radius);
+    transition:background .15s ease, color .15s ease;
+  }
+  .nav-cta:hover{ background:var(--seal-bright); color:#0d1114; }
+  @media (max-width:760px){ .navlinks{ display:none; } }
+
+  /* ---------- HERO ---------- */
+  header.hero{
+    padding:168px 0 96px;
+    border-bottom:1px solid var(--line);
+    background:
+      radial-gradient(ellipse 900px 500px at 85% -10%, rgba(63,122,148,0.16), transparent 60%);
+  }
+  .hero-grid{
+    display:grid; grid-template-columns:1.15fr 0.85fr; gap:56px; align-items:center;
+  }
+  @media (max-width:900px){ .hero-grid{ grid-template-columns:1fr; } }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:12.5px; letter-spacing:.14em;
+    color:var(--seal-bright); text-transform:uppercase; margin-bottom:18px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{ content:""; width:24px; height:1px; background:var(--seal-bright); }
+  .hero h1{
+    font-size:44px; font-weight:700; line-height:1.35; color:#f4f1e8;
+    margin-bottom:22px;
+  }
+  .hero h1 em{ font-style:normal; color:var(--seal-bright); }
+  .hero p.lede{ font-size:16px; color:var(--ink-soft); max-width:46ch; margin-bottom:34px; }
+  .hero-actions{ display:flex; gap:14px; flex-wrap:wrap; }
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:13px 22px; border-radius:var(--radius); font-size:14.5px; font-weight:500;
+    border:1px solid transparent;
+  }
+  .btn-primary{ background:var(--seal-bright); color:#0d1114; }
+  .btn-primary:hover{ background:#78b6cc; }
+  .btn-ghost{ border-color:var(--line); color:#dfe6e8; }
+  .btn-ghost:hover{ border-color:var(--ink-soft); }
+
+  /* ---------- SEAL CARD (signature element) ---------- */
+  .seal-card{
+    background:var(--paper); color:#241f16; border-radius:6px;
+    padding:30px 28px 26px; position:relative;
+    box-shadow:0 30px 60px -25px rgba(0,0,0,.6);
+  }
+  .seal-card::before{
+    content:""; position:absolute; inset:8px;
+    border:1px solid rgba(36,31,22,0.18); border-radius:3px; pointer-events:none;
+  }
+  .seal-row{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; }
+  .seal-label{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em; color:#5b5340; text-transform:uppercase; }
+  .seal-field{ font-family:'IBM Plex Mono',monospace; font-size:13px; margin-top:5px; color:#241f16; }
+  .seal-cdata{
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:#6b6350;
+    background:rgba(36,31,22,0.06); border-radius:2px; padding:10px 12px; margin:16px 0 20px;
+    word-break:break-all; line-height:1.6;
+  }
+  .seal-badge-row{ display:flex; align-items:center; gap:16px; }
+  .seal-stamp{
+    width:64px; height:64px; flex:none; opacity:0; transform:scale(1.5) rotate(-14deg);
+    animation:stampIn .5s cubic-bezier(.2,.9,.3,1.3) .35s forwards;
+  }
+  @keyframes stampIn{ to{ opacity:1; transform:scale(1) rotate(-8deg); } }
+  .seal-stamp circle{ fill:none; stroke:var(--stamp-red); stroke-width:2.4; }
+  .seal-stamp text{ fill:var(--stamp-red); font-family:'IBM Plex Mono',monospace; }
+  .seal-stamp .check{ stroke:var(--stamp-red); stroke-width:5; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+  .seal-meta{ font-size:12px; color:#5b5340; }
+  .seal-meta b{ display:block; font-family:'IBM Plex Mono',monospace; color:#241f16; font-size:13px; margin-bottom:2px; }
+  .seal-tag-inline{ display:inline-block; font-size:9.5px; letter-spacing:.06em; color:var(--stamp-red); border:1px solid var(--stamp-red); border-radius:8px; padding:1px 6px; margin-right:8px; vertical-align:middle; }
+
+  /* ---------- SECTION shell ---------- */
+  section{ padding:88px 0; border-bottom:1px solid var(--line); }
+  .sec-head{ margin-bottom:44px; max-width:64ch; }
+  .sec-eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.12em; color:var(--ink-faint); text-transform:uppercase; margin-bottom:12px; }
+  .sec-head h2{ font-size:28px; color:#f4f1e8; font-weight:600; margin-bottom:14px; }
+  .sec-head p{ color:var(--ink-soft); font-size:15px; }
+
+  /* ---------- FACT BELT ---------- */
+  .belt{ padding:52px 0; border-bottom:1px solid var(--line); }
+  .belt-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:0; }
+  .belt-item{ padding:0 28px; border-left:1px solid var(--line); }
+  .belt-item:first-child{ border-left:none; padding-left:0; }
+  .belt-item h3{ font-size:15.5px; color:#f4f1e8; font-weight:600; margin-bottom:8px; }
+  .belt-item p{ font-size:13.5px; color:var(--ink-soft); }
+  @media (max-width:760px){
+    .belt-grid{ grid-template-columns:1fr; gap:24px; }
+    .belt-item{ border-left:none; padding-left:0; border-top:1px solid var(--line); padding-top:20px; }
+    .belt-item:first-child{ border-top:none; padding-top:0; }
+  }
+
+  /* ---------- ARCHITECTURE TABS ---------- */
+  .tabbar{ display:flex; gap:8px; margin-bottom:32px; flex-wrap:wrap; }
+  .tabbtn{
+    font-family:'IBM Plex Mono',monospace; font-size:13px;
+    padding:10px 18px; border:1px solid var(--line); border-radius:20px; color:var(--ink-soft);
+    cursor:pointer; background:transparent; transition:all .15s ease;
+  }
+  .tabbtn.active{ background:var(--seal-bright); color:#0d1114; border-color:var(--seal-bright); }
+  .tabpanel{ display:none; }
+  .tabpanel.active{ display:block; animation:fadeUp .35s ease; }
+  @keyframes fadeUp{ from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:translateY(0);} }
+
+  .flow{ display:flex; flex-direction:column; gap:0; }
+  .flow-node{
+    background:var(--ink-2); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px 20px; position:relative;
+  }
+  .flow-node h4{ font-size:14.5px; color:#f4f1e8; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .flow-node h4 .tag{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--seal-bright); border:1px solid var(--seal-bright); border-radius:10px; padding:2px 8px; }
+  .flow-node p{ font-size:13.5px; color:var(--ink-soft); }
+  .flow-node .mono-line{ font-size:12.5px; color:var(--ink-faint); margin-top:8px; }
+  .flow-arrow{ display:flex; justify-content:center; padding:6px 0; color:var(--ink-faint); font-size:13px; }
+  .flow-arrow .lbl{ font-family:'IBM Plex Mono',monospace; font-size:11px; background:var(--ink); padding:2px 8px; border:1px solid var(--line); border-radius:10px; }
+
+  /* ---------- CONCEPT GRID ---------- */
+  .concept-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:var(--line); border:1px solid var(--line); }
+  .concept-card{ background:var(--ink); padding:26px 26px; }
+  .concept-card h4{ font-size:15.5px; color:#f4f1e8; margin-bottom:10px; font-family:'IBM Plex Mono',monospace; }
+  .concept-card p{ font-size:13.5px; color:var(--ink-soft); }
+  @media (max-width:760px){ .concept-grid{ grid-template-columns:1fr; } }
+
+  /* ---------- TABLE ---------- */
+  table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  th,td{ text-align:left; padding:12px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); font-weight:500; }
+  td{ color:#dfe6e8; }
+  td.dim, td code{ color:var(--ink-soft); }
+  .table-wrap{ overflow-x:auto; }
+  .yes{ color:var(--seal-bright); }
+  .no{ color:var(--ink-faint); }
+
+  /* comparison table highlight column */
+  .cmp-highlight{ background:rgba(63,122,148,0.09); }
+
+  /* ---------- CODE BLOCK ---------- */
+  .steps{ display:flex; flex-direction:column; gap:36px; }
+  .step{ display:grid; grid-template-columns:64px 1fr; gap:20px; }
+  .step-num{ font-family:'IBM Plex Mono',monospace; color:var(--ink-faint); font-size:13px; padding-top:4px; }
+  .step h4{ font-size:15px; color:#f4f1e8; margin-bottom:10px; font-weight:600; }
+  pre{
+    background:var(--ink-2); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px 20px; overflow-x:auto; font-size:12.8px; color:#c7cfd2; line-height:1.65;
+  }
+  pre .c-key{ color:var(--seal-bright); }
+  pre .c-str{ color:#c9a875; }
+  pre .c-com{ color:var(--ink-faint); }
+  @media (max-width:760px){ .step{ grid-template-columns:1fr; } .step-num{ padding-top:0; } }
+
+  /* ---------- FOOTER ---------- */
+  footer{ padding:64px 0 48px; }
+  .footer-grid{ display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:24px; }
+  footer .brand{ margin-bottom:10px; }
+  footer p{ font-size:13px; color:var(--ink-faint); max-width:40ch; }
+  .footer-links{ display:flex; gap:22px; font-size:13.5px; color:var(--ink-soft); }
+  .footer-links a:hover{ color:#fff; }
+
+  .badge-inline{
+    display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:11px;
+    color:var(--ink-faint); border:1px solid var(--line); border-radius:10px; padding:2px 9px; margin-left:8px;
+  }
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>license-next</h1>
-  <p class="subtitle">轻量级客户端 License 验证框架 — 将 issuer（服务端）与 checker（客户端）分离</p>
 
-  <a class="btn" href="issuer.html">🧪 在线生成 CData</a>
-  <a class="btn btn-outline" href="https://github.com/doc-war/license-next">GitHub</a>
-
-  <div class="intro">
-    <strong>设计理念：</strong>
-    client 包只依赖验签和 CData 解码；issuer 包独立，只有服务端项目才需要 import。
-    CKD 协议提供无状态、可逆的 License 编码，支持前向兼容。
+<nav>
+  <div class="wrap">
+    <div class="brand"><span class="brand-mark"></span>license-next</div>
+    <div class="navlinks">
+      <a href="#concepts">核心概念</a>
+      <a href="#compare">对比</a>
+      <a href="#quickstart">快速开始</a>
+      <a href="https://github.com/doc-war/license-next">GitHub</a>
+    </div>
+    <a class="nav-cta" href="./issuer.html">打开签发工具 →</a>
   </div>
+</nav>
 
-  <h2>架构</h2>
-  <div class="arch">
-<pre>issuer (服务端)
-  ├─ ECDSA P-256 签名
-  ├─ CKD 派生（可选）
-  └─ → LicenseSign JSON
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow">license issuance and verification</div>
+      <h1>下一代 <em>License</em><br>签发与验证框架</h1>
+      <p class="lede">license-next 把 License 的签发（issuer）与客户端的校验（checker）彻底分离——不需要常驻的 license server 进程，极其轻量的客户端集成体验。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="./issuer.html">生成 License →</a>
+        <a class="btn btn-ghost" href="#quickstart">查看接入代码</a>
+      </div>
+    </div>
 
-checker (客户端)
-  ├─ 本地缓存
-  ├─ 签名验证
-  ├─ CData 解码
-  ├─ 到期/机器码校验
-  └─ 远程刷新 → Fallback</pre>
+    <div class="seal-card">
+      <div class="seal-row">
+        <div>
+          <div class="seal-label">License</div>
+          <div class="seal-field">product: myapp</div>
+          <div class="seal-field">customer: acme-001</div>
+          <div class="seal-field">expireAt: 2030-12-31</div>
+          <div class="seal-field">machineID: target-machine-id</div>
+          <div class="seal-field" style="color:#8a8163;">…</div>
+        </div>
+        <svg class="seal-stamp" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="28"/>
+          <circle cx="32" cy="32" r="22"/>
+          <path class="check" d="M21 33 L28 40 L44 24"/>
+        </svg>
+      </div>
+      <div class="seal-cdata"><span class="seal-tag-inline">CKD · 内部编码</span> c_data: 8f3a1c…e02d</div>
+      <div class="seal-badge-row">
+        <div class="seal-meta">
+          <b>ECC · 外部签名</b>
+          timestamp: 1750000000 · c_data: 8f3a1c…e02d<br>
+          ECDSA P-256 · signature: MEUCIQDx7…3kZ2A==<br>revoked: false · 新鲜度窗口内
+        </div>
+      </div>
+    </div>
   </div>
+</header>
 
-  <h2>快速开始</h2>
-  <h3>1. 生成密钥对</h3>
-<pre>openssl ecparam -genkey -name prime256v1 -out key-private.pem
+<section id="concepts">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-eyebrow">core concepts</div>
+      <h2>License 是合同，CData 是它的密文</h2>
+      <p>四个概念构成整个框架：合同本身、合同的可逆编码、签名后的传输结构，以及校验结果的三种状态。</p>
+    </div>
+
+    <div class="concept-grid">
+      <div class="concept-card">
+        <h4>License</h4>
+        <p>授权合同的原始明文：customer、product、expireAt、machineID、features。是签发和校验共同理解的业务对象。</p>
+      </div>
+      <div class="concept-card">
+        <h4>CData</h4>
+        <p>License 经 CKD 协议用 MasterKey 派生编码后的字符串——可逆、无状态、不直接暴露明文，客户端配置同一 MasterKey 即可还原。</p>
+      </div>
+      <div class="concept-card">
+        <h4>LicenseSign</h4>
+        <p>{ c_data, timestamp, signature, revoked }。签名覆盖 CData + "|" + timestamp，防止 CData 被单独重放。</p>
+      </div>
+      <div class="concept-card">
+        <h4>校验结果三态</h4>
+        <p><span class="mono" style="color:var(--seal-bright)">ResultOK</span> 直接放行；<span class="mono" style="color:#c9a875">ResultNeedRemote</span> 联网确认，失败即拒绝启动；<span class="mono" style="color:var(--stamp-red)">ResultInvalid</span> 明确不匹配，直接拒绝。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-eyebrow">api overview</div>
+      <h2>API 速览</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>方法</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>Check()</code></td><td>完整校验，本地优先 + 自动远端刷新</td></tr>
+          <tr><td><code>SimpleCheck()</code></td><td>纯本地校验，不联网</td></tr>
+          <tr><td><code>Verify(licJSON)</code></td><td>验签并持久化 .lic 文件内容</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="architecture">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-eyebrow">architecture</div>
+      <h2>两种业务形态，一套框架</h2>
+      <p>两种形态的区别只在于客户端校验时要不要联网确认新鲜度。</p>
+    </div>
+
+    <div class="tabbar">
+      <button class="tabbtn active" data-tab="offline">纯离线签名</button>
+      <button class="tabbtn" data-tab="online">在线刷新签名</button>
+    </div>
+
+    <div class="tabpanel active" id="tab-offline">
+      <div class="flow">
+        <div class="flow-node">
+          <h4>签发端（html或wasm集成）<span class="tag">issuer</span></h4>
+          <p>打开issuer.html，用 WASM 编码的 encodeCData 生成 License，下载 .lic 文件。</p>
+        </div>
+        <div class="flow-arrow"><span class="lbl">手动复制 .lic 给客户</span></div>
+        <div class="flow-node">
+          <h4>客户端（Go 应用）<span class="tag">checker</span></h4>
+          <p>licensenext.New(cfg) → SimpleCheck()，只做本地缓存校验：签名有效性、机器码、过期时间、产品名，<b style="color:#dfe6e8">不校验签名新鲜度</b>。</p>
+          <div class="mono-line">优点：不依赖服务端　·　代价：无法主动吊销</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabpanel" id="tab-online">
+      <div class="flow">
+        <div class="flow-node">
+          <h4>签发端（html或wasm集成）<span class="tag">issuer</span></h4>
+          <p>同样通过 issuer.html 生成 CData 字符串，手动复制。</p>
+        </div>
+        <div class="flow-arrow"><span class="lbl">写入 KV</span></div>
+        <div class="flow-node">
+          <h4>请求端<span class="tag">Cloudflare Worker</span></h4>
+          <p>提供开箱即用的 Cloudflare Worker 代码。KV 以 machine_id 为 key 存储 CData；GET /v1/query?machine_id=xxx 读取后用 Web Crypto ECDSA P-256 签名，返回 LicenseSign JSON。</p>
+        </div>
+        <div class="flow-arrow"><span class="lbl">超出新鲜度窗口时自动请求</span></div>
+        <div class="flow-node">
+          <h4>客户端（Go 应用）<span class="tag">checker</span></h4>
+          <p>licensenext.New(cfg) → Check()：本地校验优先，新鲜度过期才联网刷新签名；异步预刷新按 3 天节流，不阻塞启动。</p>
+          <div class="mono-line">优点：可通过 revoked 字段主动吊销　·　代价：需要部署一个 Worker</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-eyebrow">check vs simplecheck</div>
+      <h2>联网校验，还是纯离线校验</h2>
+      <p>两者共享同一套本地校验逻辑，区别只在要不要联网、要不要新鲜度窗口。</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>能力</th><th>Check</th><th>SimpleCheck</th></tr></thead>
+        <tbody>
+          <tr><td>签名 / 机器码 / 产品一致性 / 过期判断</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>本地缓存读取与验签</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>需要本地手动配置 .lic 文件</td><td class="no">不需要，自动远端 fetch</td><td class="yes">需要</td></tr>
+          <tr><td>新鲜度窗口</td><td class="yes">超窗触发远端</td><td class="no">不参与</td></tr>
+          <tr><td>远端请求</td><td class="yes">自动</td><td class="no">不触发</td></tr>
+          <tr><td>调用方式</td><td class="dim"><code>Check()</code></td><td class="dim"><code>Verify()</code> + <code>SimpleCheck()</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-eyebrow">comparison</div>
+      <h2>与老牌方案相比</h2>
+      <p>核心校验能力（签名、机器码绑定、过期、吊销）与 FlexLM、Sentinel、keygen.sh 对齐，但运维负担更轻。</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>FlexLM</th><th>Sentinel</th><th>keygen.sh</th><th class="cmp-highlight">license-next</th></tr></thead>
+        <tbody>
+          <tr><td>部署形态</td><td class="dim">独立 license server 进程</td><td class="dim">独立守护进程 / 硬件狗</td><td class="dim">托管 SaaS API</td><td class="cmp-highlight">一个 HTTP 查询接口 + 本地缓存</td></tr>
+          <tr><td>运维负担</td><td class="dim">需要维护常驻服务</td><td class="dim">需要维护常驻服务</td><td class="dim">依赖第三方可用性</td><td class="cmp-highlight">Worker 无状态，KV 存储</td></tr>
+          <tr><td>离线可用</td><td class="dim">受限</td><td class="dim">支持（硬件狗）</td><td class="dim">受限</td><td class="cmp-highlight">纯离线签名模式原生支持</td></tr>
+          <tr><td>主动吊销</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="cmp-highlight yes">✓（在线刷新模式）</td></tr>
+          <tr><td>调用方接入心智</td><td class="dim">需理解服务端协议细节</td><td class="dim">需接入 SDK 与硬件层</td><td class="dim">需处理 API 限流 / 重试</td><td class="cmp-highlight">只区分成功 / 失败两种结果</td></tr>
+          <tr><td>代码归属</td><td class="dim">闭源商业授权</td><td class="dim">闭源商业授权</td><td class="dim">部分开源</td><td class="cmp-highlight">MIT 开源</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="quickstart">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-eyebrow">quickstart</div>
+      <h2>五分钟接入</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div>
+          <h4>安装</h4>
+          <pre>go get github.com/doc-war/license-next</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div>
+          <h4>生成密钥对</h4>
+          <pre>openssl ecparam -genkey -name prime256v1 -out key-private.pem
 openssl ec -in key-private.pem -pubout -out key-public.pem</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div>
+          <h4>在浏览器里生成 License</h4>
+          <p style="font-size:13.5px;color:var(--ink-soft);margin-bottom:12px;">打开 <a href="./issuer.html" style="color:var(--seal-bright);">official/issuer.html</a>，填入 License 参数与 MasterKey，直接生成 .lic 文件交给客户；也可以用 Go 侧的 issuer 子包生成。</p>
+          <pre><span class="c-key">import</span> <span class="c-str">"github.com/doc-war/license-next/issuer"</span>
 
-  <h3>2. 服务端签发 License</h3>
-<pre>package main
-import "github.com/doc-war/license-next/issuer"
-
-iss, _ := issuer.New(issuer.Config{PrivateKey: privPEM})
+iss, _ := issuer.New(issuer.Config{
+    PrivateKey: privPEM,
+    MasterKey:  masterKey,
+})
 ls, _ := iss.Sign(&issuer.License{
-    Customer:  "Acme Corp",
+    Customer:  <span class="c-str">"acme-001"</span>,
+    Product:   <span class="c-str">"myapp"</span>,
     ExpireAt:  time.Date(2030, 12, 31, 23, 59, 59, 0, time.UTC),
-    Product:   "myapp",
-    MachineID: "target-mid",
-    Features:  []string{"premium"},
-})
-// ls.CData / ls.Timestamp / ls.Signature</pre>
-
-  <h3>3. 客户端校验</h3>
-<pre>import licensenext "github.com/doc-war/license-next"
-
-checker, _ := licensenext.New(licensenext.Config{
-    Product:   "myapp",
+    MachineID: <span class="c-str">"target-machine-id"</span>,
+})</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <div>
+          <h4>客户端集成</h4>
+          <pre>checker, err := licensenext.New(licensenext.Config{
+    Product:   <span class="c-str">"myapp"</span>,
     PublicKey: pubPEM,
-    RemoteURL: "https://your-worker.workers.dev/v1/query",
+    MasterKey: masterKey,
+    RemoteURL: <span class="c-str">"https://your-worker.workers.dev/v1/query"</span>,
 })
-lic, err := checker.Check(context.Background())</pre>
 
-  <h2>CData 编码</h2>
-  <p>CData 是 License 合同的编码字符串，支持两种方式：</p>
-  <table>
-    <tr><th>方式</th><th>说明</th><th>场景</th></tr>
-    <tr><td>base64url</td><td>JSON 序列化后 URL-safe base64 编码</td><td>无 CKD 需求</td></tr>
-    <tr><td>CKD</td><td>通过 MasterKey 派生的可逆编码，隐藏原始数据</td><td>需要保密 License 内容</td></tr>
-  </table>
-  <p>两种方式对客户端透明：客户端配置 MasterKey 则自动使用 CKD 解码，否则使用 base64url。</p>
+lic, err := checker.Check()
+<span class="c-key">if</span> err != <span class="c-key">nil</span> {
+    log.Fatalf(<span class="c-str">"license校验失败: %v"</span>, err)
+}
+log.Printf(<span class="c-str">"欢迎 %s，有效期至 %s"</span>, lic.CustomerNickname, lic.ExpireAt.Format(<span class="c-str">"2006-01-02"</span>))</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
-  <h2>LicenseSign 结构</h2>
-<pre>{
-  "c_data":    "base64url 或 CKD 编码的 License",
-  "timestamp": 1750000000,
-  "signature": "ECDSA P-256 ASN.1 DER base64 签名",
-  "revoked":   false
-}</pre>
-  <p>签名覆盖 <code>CData + "|" + Timestamp</code>，防止 CData 单独被重放。</p>
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-eyebrow">config</div>
+      <h2>配置项</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>字段</th><th>默认值</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>Product string</code></td><td class="dim">必填</td><td>产品名，用于隔离本地存储目录</td></tr>
+          <tr><td><code>MasterKey string</code></td><td class="dim">必填</td><td>CKD 主密钥</td></tr>
+          <tr><td><code>PublicKey string</code></td><td class="dim">必填</td><td>ECC 公钥 PEM</td></tr>
+          <tr><td><code>RemoteURL string</code></td><td class="dim">""</td><td>license 查询 API 地址</td></tr>
+          <tr><td><code>StorageDir string</code></td><td class="dim">~/.license-next/{product}/</td><td>本地存储根目录</td></tr>
+          <tr><td><code>FreshWindow time.Duration</code></td><td class="dim">7 天</td><td>新鲜度窗口</td></tr>
+          <tr><td><code>RefreshInterval time.Duration</code></td><td class="dim">3 天</td><td>异步预刷新节流间隔</td></tr>
+          <tr><td><code>HTTPTimeout time.Duration</code></td><td class="dim">5s</td><td>远端请求超时（失败后自动重试一次）</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
 
-  <h2>工具</h2>
-  <ul>
-    <li><a href="issuer.html">在线 CData 生成器</a> — 浏览器内计算 CData，不走网络</li>
-    <li><code>worker/</code> — Cloudflare Worker 模板，对接 KV 存储 + Web Crypto 签名</li>
-    <li><code>cmd/wasm-issuer/</code> — wasip1 目标 WASM 编译（Worker 内签名用）</li>
-  </ul>
+<section style="border-bottom:none;">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-eyebrow">sub-projects</div>
+      <h2>仓库结构</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>目录</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>official/</code></td><td>官网在线工具，issuer.html 生成 CData，index.html 文档页</td></tr>
+          <tr><td><code>wasm/</code></td><td>浏览器 WASM 入口（GOOS=js 编译），暴露 encodeCData</td></tr>
+          <tr><td><code>worker/</code></td><td>Cloudflare Worker 模板，Web Crypto 签名 + KV 查询</td></tr>
+          <tr><td><code>issuer/</code></td><td>Go 服务端签发包（ECDSA 签名 + CKD 派生）</td></tr>
+          <tr><td><code>examples/</code></td><td>集成示例（checker / issuer / 全流程）</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
 
-  <h2>许可</h2>
-  <p>MIT License</p>
-</div>
+<footer>
+  <div class="wrap footer-grid">
+    <div>
+      <div class="brand"><span class="brand-mark"></span>license-next</div>
+      <p>MIT 许可 · ©️zhaoliwei · <a herf="https://doc-war.com" target="_blank">Doc-War</a></p>
+    </div>
+    <div class="footer-links">
+      <a href="official/issuer.html">签发工具</a>
+      <a href="https://github.com/doc-war/license-next">GitHub</a>
+      <a href="#quickstart">快速开始</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('.tabbtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // replay the seal stamp animation whenever it scrolls back into view
+  const seal = document.querySelector('.seal-stamp');
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        seal.style.animation = 'none';
+        void seal.offsetWidth;
+        seal.style.animation = null;
+      }
+    });
+  }, {threshold:0.4});
+  io.observe(seal);
+</script>
+
 </body>
 </html>

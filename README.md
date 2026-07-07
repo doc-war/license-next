@@ -4,7 +4,7 @@
 
 ## 业务选择
 
-### 纯离线签名
+### 1、纯离线签名
 无法吊销license，但是不依赖服务端。
 
 ```
@@ -26,7 +26,7 @@
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 在线刷新签名
+### 2、在线刷新签名
 依赖服务端，提供license自动刷新签名端点，可以通过配置revoked主动吊销license
 ```
                        │  客户提供机器码
@@ -70,8 +70,11 @@ type License struct {
     Product          string    // 产品名
     Features         []string  // 功能列表（可选）
     MachineID        string    // 绑定的机器码
+    Extensions       string    // 自定义扩展数据（建议 JSON 字符串，框架透明透传）
 }
 ```
+
+> **Extensions 说明**：如果需要携带销售信息、订单号等自定义元数据，建议使用 JSON 字符串存入 `Extensions` 字段。框架只做透传不做解析，开发者自行 `json.Unmarshal` 使用。例如 `{"salesperson":"张三","order_id":"ORD-001"}`。
 
 ### CData — License 编码字符串
 
@@ -106,16 +109,25 @@ CData 是 License 原始合同明文经过 CKD 协议编码后的字符串，使
 
 | | `Check` | `SimpleCheck` |
 |---|---|---|
-| 签名 / 机器码 / 产品 / 过期 | ✅ | ✅ |
+| 签名有效性 / 机器码一致性 / 产品一致性 / 是否过期 | ✅ | ✅ |
 | 本地缓存读取 | ✅ | ✅ |
 | 本地验签 | ✅ | ✅ |
+| 本地手动配置.lic | ❌不需要，自动远端fetch | ✅需要 |
 | 新鲜度窗口 | ✅ 超窗触发远端 | ❌ 不参与 |
 | 远端请求 | ✅ 自动 | ❌ 不触发 |
-| 调用方式 | `Check()` | `SimpleCheck()` |
+| 调用方式 | `Check()` | `Verify(licenseString)` + `SimpleCheck()` |
 
 适用于无需联网刷新的离线场景：
 
 ```go
+//首次客户上传.lic文件，读取json字符串，调用验证和自动归档
+license, err := checker.Verify(licenseString)
+if err != nil {
+    log.Fatalf("license校验失败: %v", err)
+}
+log.Printf("欢迎 %s", lic.CustomerNickname)
+
+//之后每次启动自动寻址验证
 lic, err := checker.SimpleCheck()
 if err != nil {
     log.Fatalf("license校验失败: %v", err)
@@ -141,18 +153,18 @@ openssl ec -in key-private.pem -pubout -out key-public.pem
 ### 2. 生成 CData（License 编码字符串）
 
 打开 `official/issuer.html`（浏览器），输入 License 参数和 MasterKey，点击生成。
-
-或者使用签发子包：
+或者使用签发子包（其他语言课使用wasm）：
 
 ```go
 package main
 
 import "github.com/doc-war/license-next/issuer"
-
+//初始化签发器
 iss, _ := issuer.New(issuer.Config{
     PrivateKey: privPEM,
     MasterKey:  masterKey,
 })
+//签发带签名的LicenseSign对象
 ls, _ := iss.Sign(&issuer.License{
     Customer:         "acme-001",
     CustomerNickname: "Acme Corp",
@@ -163,6 +175,7 @@ ls, _ := iss.Sign(&issuer.License{
     Features:         []string{"premium", "audit-log"},
 })
 // ls.CData 就是 License 编码字符串
+// ls进行json序列化，再放入一个.lic文件里，传递给客户，让客户端支持客户上传这个文件，读取json字符串调用verify接口，框架会自动验证并将其规范缓存到本地目录。
 ```
 
 ### 3. 部署 Cloudflare Worker
@@ -181,7 +194,7 @@ wrangler deploy
 
 ```go
 import licensenext "github.com/doc-war/license-next"
-
+//初始化检查器
 checker, err := licensenext.New(licensenext.Config{
     Product:   "myapp",
     PublicKey: pubPEM,
@@ -191,8 +204,8 @@ checker, err := licensenext.New(licensenext.Config{
 if err != nil {
     log.Fatal(err)
 }
-
-lic, err := checker.Check(context.Background())
+//自动检查
+lic, err := checker.Check()
 if err != nil {
     log.Fatalf("license校验失败: %v", err)
 }
@@ -206,9 +219,9 @@ log.Printf("可用功能: %v", lic.Features)
 | 字段 | 默认值 | 说明 |
 |---|---|---|
 | `Product string` | 必填 | 产品名，用于隔离本地存储目录 |
+| `MasterKey string` | 必填 | CKD 主密钥 |
 | `PublicKey string` | 必填 | ECC 公钥 PEM |
 | `RemoteURL string` | `""` | license 查询 API 地址 |
-| `MasterKey string` | 必填 | CKD 主密钥 |
 | `StorageDir string` | `~/.license-next/{product}/` | 本地存储根目录 |
 | `FreshWindow time.Duration` | 7 天 | 新鲜度窗口 |
 | `RefreshInterval time.Duration` | 3 天 | 异步预刷新节流间隔 |

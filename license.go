@@ -6,6 +6,7 @@ package licensenext
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -149,6 +150,16 @@ func (c *Checker) Check() (*License, error) {
 		}
 		return nil, errors.New("licensenext: license校验失败")
 	}
+}
+
+// Verify 验证并持久化 LicenseSign JSON（.lic 文件内容）。
+// 成功后将 License 缓存到本地，后续可直接调用 Check() 或 SimpleCheck()。
+func (c *Checker) Verify(licJSON string) (*License, error) {
+	var ls LicenseSign
+	if err := json.Unmarshal([]byte(licJSON), &ls); err != nil {
+		return nil, fmt.Errorf("licensenext: LicenseSign 解析失败: %w", err)
+	}
+	return c.validateAndPersist(&ls)
 }
 
 // SimpleCheck 执行完全的本地校验，不解码缓存、不联网、不检查新鲜度。

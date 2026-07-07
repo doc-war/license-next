@@ -13,6 +13,7 @@ type License struct {
 	Product          string    `json:"product"`                      // 产品名
 	Features         []string  `json:"features,omitempty"`           // 功能列表（可选）
 	MachineID        string    `json:"machine_id"`                   // 绑定的机器码
+	Extensions       string    `json:"extensions,omitempty"`         // 自定义扩展数据（建议 JSON 字符串）
 }
 
 // LicenseSign 服务端返回的完整签名结构

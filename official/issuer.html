@@ -23,6 +23,7 @@
   .btn-primary:disabled { background: #999; cursor: not-allowed; }
   .btn-success { background: #2e7d32; color: #fff; }
   .btn-success:hover { background: #1b5e20; }
+  .btn-success:disabled { background: #999; cursor: not-allowed; }
   #result { margin-top: 16px; }
   #result textarea { background: #f8f9fa; min-height: 80px; }
   .copy-btn { font-size: 12px; padding: 4px 12px; background: #e8eaed; color: #333; margin-top: 4px; }
@@ -32,7 +33,7 @@
   .status-loading { background: #e3f2fd; color: #1565c0; }
   .status-ready { background: #e8f5e9; color: #2e7d32; }
   .status-error { background: #ffebee; color: #c62828; }
-  .mode-switch { display: flex; gap: 0; margin-bottom: 20px; border: 1px solid #d0d0d0; border-radius: 4px; overflow: hidden; }
+  .mode-switch { display: flex; gap: 0; margin-bottom: 16px; border: 1px solid #d0d0d0; border-radius: 4px; overflow: hidden; }
   .mode-switch button { flex: 1; padding: 10px; font-size: 13px; background: #f5f5f5; color: #666; border-radius: 0; }
   .mode-switch button.active { background: #1a73e8; color: #fff; }
   .mode-switch button:not(:last-child) { border-right: 1px solid #d0d0d0; }
@@ -48,6 +49,34 @@
   .expire-options a { font-size: 11px; color: #999; cursor: pointer; margin-right: 6px; text-decoration: none; }
   .expire-options a:hover { color: #1a73e8; }
   .expire-options a.active { color: #1a73e8; font-weight: 600; }
+
+  /* Section tabs */
+  .section-tabs { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 2px solid #e0e0e0; }
+  .section-tab { padding: 8px 16px; font-size: 13px; background: none; color: #888; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .section-tab:hover { color: #555; }
+  .section-tab.active { color: #1a73e8; border-bottom-color: #1a73e8; font-weight: 600; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+  .tab-pane-hint { font-size: 12px; color: #888; background: #f8f9fa; padding: 8px 12px; border-radius: 4px; margin-bottom: 14px; line-height: 1.6; }
+  .tab-pane-hint code { background: #eee; padding: 1px 4px; border-radius: 2px; font-size: 11px; }
+
+  /* Extensions KV rows */
+  .ext-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .ext-row input { flex: 1; }
+  .ext-remove { flex-shrink: 0; padding: 8px 12px; font-size: 13px; background: #ffebee; color: #c62828; border-radius: 4px; }
+  .ext-remove:hover { background: #ffcdd2; }
+  .ext-add { padding: 6px 16px; font-size: 12px; background: #e8f5e9; color: #2e7d32; border-radius: 4px; margin-top: 4px; }
+  .ext-add:hover { background: #c8e6c9; }
+
+  /* Security section */
+  .security-section { margin-top: 20px; border: 1px solid #e8e8e8; border-radius: 6px; overflow: hidden; }
+  .security-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #fafafa; border-bottom: 1px solid #e8e8e8; cursor: pointer; user-select: none; }
+  .security-header .title { font-size: 13px; font-weight: 600; color: #555; }
+  .security-header .title .arrow { display: inline-block; transition: transform .2s; margin-right: 4px; }
+  .security-header .title .arrow.collapsed { transform: rotate(-90deg); }
+  .security-hint { font-size: 11px; color: #e65100; background: #fff3e0; padding: 2px 8px; border-radius: 10px; }
+  .security-body { padding: 14px; }
+  .security-body.collapsed { display: none; }
 </style>
 </head>
 <body>
@@ -62,49 +91,84 @@
     <button id="modeLic">生成 license.lic</button>
   </div>
 
-  <div class="field">
-    <label for="customer">客户标识 <span class="label-hint">（前端反显）</span></label>
-    <input id="customer" value="acme-001" placeholder="e.g. acme-001">
+  <!-- Section tabs: 标准字段 / 扩展数据 -->
+  <div class="section-tabs">
+    <button id="tabStandard" class="section-tab active">标准字段</button>
+    <button id="tabExtension" class="section-tab">扩展数据</button>
   </div>
-  <div class="row">
+
+  <!-- Tab: 标准字段 -->
+  <div id="paneStandard" class="tab-pane active">
     <div class="field">
-      <label for="customerNickname">客户昵称<span class="label-hint">（前台反显）</span></label>
-      <input id="customerNickname" value="Acme Corp" placeholder="e.g. Acme Corp">
+      <label for="customer">客户标识 <span class="label-hint">（前端反显）</span></label>
+      <input id="customer" value="acme-001" placeholder="e.g. acme-001">
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="customerNickname">客户昵称<span class="label-hint">（前台反显）</span></label>
+        <input id="customerNickname" value="Acme Corp" placeholder="e.g. Acme Corp">
+      </div>
+      <div class="field">
+        <label for="customerEmail">客户邮箱<span class="label-hint">（前台反显）</span></label>
+        <input id="customerEmail" value="admin@acme.com" placeholder="e.g. admin@acme.com">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="expireAt">
+          过期时间
+          <span class="expire-options">
+            <a data-months="2">2个月</a>
+            <a data-months="6" class="active">半年</a>
+            <a data-months="12">一年</a>
+          </span>
+        </label>
+        <input id="expireAt" type="datetime-local">
+      </div>
+      <div class="field">
+        <label for="product">产品名 <span class="label-hint">（影响缓存唯一路径，建议保持唯一）</span></label>
+        <input id="product" value="myapp" placeholder="e.g. myapp">
+      </div>
     </div>
     <div class="field">
-      <label for="customerEmail">客户邮箱<span class="label-hint">（前台反显）</span></label>
-      <input id="customerEmail" value="admin@acme.com" placeholder="e.g. admin@acme.com">
-    </div>
-  </div>
-  <div class="row">
-    <div class="field">
-      <label for="expireAt">
-        过期时间
-        <span class="expire-options">
-          <a data-months="2">2个月</a>
-          <a data-months="6" class="active">半年</a>
-          <a data-months="12">一年</a>
-        </span>
-      </label>
-      <input id="expireAt" type="datetime-local">
+      <label for="machineID">机器码 <span class="label-hint">（machine_id 匹配依据）</span></label>
+      <input id="machineID" placeholder="客户提供的机器码">
     </div>
     <div class="field">
-      <label for="product">产品名 <span class="label-hint">（影响缓存唯一路径，建议保持唯一）</span></label>
-      <input id="product" value="myapp" placeholder="e.g. myapp">
+      <label for="features">功能列表<span class="label-hint">（JSON 数组，可选）</span></label>
+      <input id="features" value='["premium","audit-log"]' placeholder='["premium"]'>
     </div>
   </div>
-  <div class="field">
-    <label for="machineID">机器码 <span class="label-hint">（machine_id 匹配依据）</span></label>
-    <input id="machineID" placeholder="客户提供的机器码">
+
+  <!-- Tab: 扩展数据 -->
+  <div id="paneExtension" class="tab-pane">
+    <div class="tab-pane-hint">
+      扩展数据将序列化为 JSON 字符串存入 <code>extensions</code> 字段，
+      框架仅透传不做解析。客户端通过 <code>lic.Extensions</code> 读取后自行
+      <code>json.Unmarshal</code> 使用。
+    </div>
+    <div id="extensionsContainer"></div>
+    <button id="addExtBtn" class="ext-add">＋ 添加字段</button>
   </div>
-  <div class="field">
-    <label for="features">功能列表<span class="label-hint">（JSON 数组，可选）</span></label>
-    <input id="features" value='["premium","audit-log"]' placeholder='["premium"]'>
-  </div>
-  <div class="field">
-    <label for="masterKey">MasterKey<span class="label-hint">（32 字节字符串）</span></label>
-    <input id="masterKey" placeholder="必填，输入 CKD MasterKey" required>
-    <div class="hint">客户端配置相同的 MasterKey 才能解码</div>
+
+  <!-- 安全要素 -->
+  <div class="security-section">
+    <div class="security-header" id="securityToggle">
+      <span class="title"><span class="arrow" id="securityArrow">▼</span>安全要素</span>
+      <span class="security-hint">仅用于本地计算，数据不会被上传</span>
+    </div>
+    <div class="security-body" id="securityBody">
+      <div class="field">
+        <label for="masterKey">MasterKey<span class="label-hint">（32 字节字符串）</span></label>
+        <input id="masterKey" placeholder="必填，输入 CKD MasterKey" required>
+        <div class="hint">客户端配置相同的 MasterKey 才能解码</div>
+      </div>
+      <div class="field" id="privKeyField" style="display:none">
+        <label for="privKeyFile">ECC 私钥文件（PEM 格式）</label>
+        <input id="privKeyFile" type="file" accept=".pem" style="padding:6px 10px;">
+        <div class="hint">选择私钥文件，用于 ECDSA 签名。文件不会被上传。</div>
+      </div>
+    </div>
   </div>
 
   <!-- 模式 1：CData -->
@@ -125,11 +189,6 @@
 
   <!-- 模式 2：license.lic -->
   <div id="sectionLic" class="mode-section">
-    <div class="field">
-      <label for="privKeyFile">ECC 私钥文件（PEM 格式）</label>
-      <input id="privKeyFile" type="file" accept=".pem" style="padding:6px 10px;">
-      <div class="hint">选择私钥文件，用于 ECDSA 签名。文件不会被上传。</div>
-    </div>
     <button id="generateLicBtn" class="btn-success" disabled>生成并下载 license.lic</button>
     <div id="resultLic" style="display:none;margin-top:16px;">
       <div class="detail-grid">
@@ -157,7 +216,6 @@ let currentLicResult = null;
 function setExpireByMonths(months) {
   const d = new Date();
   d.setMonth(d.getMonth() + months);
-  // 取整到小时
   d.setMinutes(0, 0, 0);
   document.getElementById('expireAt').value = d.toISOString().slice(0, 16);
   document.querySelectorAll('.expire-options a').forEach(el => el.classList.remove('active'));
@@ -165,13 +223,13 @@ function setExpireByMonths(months) {
 }
 setExpireByMonths(6);
 
-// 过期时间快捷选项
 document.querySelectorAll('.expire-options a').forEach(el => {
   el.addEventListener('click', function() {
     setExpireByMonths(parseInt(this.dataset.months));
   });
 });
 
+// WASM 初始化
 WebAssembly.instantiateStreaming(fetch('issuer.wasm'), go.importObject)
   .then(result => {
     go.run(result.instance);
@@ -186,20 +244,88 @@ WebAssembly.instantiateStreaming(fetch('issuer.wasm'), go.importObject)
     document.getElementById('status').textContent = '❌ WASM 加载失败: ' + err.message;
   });
 
-// 模式切换
+// === 模式切换：CData / license.lic ===
 document.getElementById('modeCData').addEventListener('click', function() {
   this.classList.add('active');
   document.getElementById('modeLic').classList.remove('active');
   document.getElementById('sectionCData').classList.add('active');
   document.getElementById('sectionLic').classList.remove('active');
+  document.getElementById('privKeyField').style.display = 'none';
 });
 document.getElementById('modeLic').addEventListener('click', function() {
   this.classList.add('active');
   document.getElementById('modeCData').classList.remove('active');
   document.getElementById('sectionLic').classList.add('active');
   document.getElementById('sectionCData').classList.remove('active');
+  document.getElementById('privKeyField').style.display = '';
 });
 
+// === Section Tab 切换：标准字段 / 扩展数据 ===
+document.getElementById('tabStandard').addEventListener('click', function() {
+  this.classList.add('active');
+  document.getElementById('tabExtension').classList.remove('active');
+  document.getElementById('paneStandard').classList.add('active');
+  document.getElementById('paneExtension').classList.remove('active');
+});
+document.getElementById('tabExtension').addEventListener('click', function() {
+  this.classList.add('active');
+  document.getElementById('tabStandard').classList.remove('active');
+  document.getElementById('paneExtension').classList.add('active');
+  document.getElementById('paneStandard').classList.remove('active');
+});
+
+// === 安全要素折叠 ===
+document.getElementById('securityToggle').addEventListener('click', function() {
+  const body = document.getElementById('securityBody');
+  const arrow = document.getElementById('securityArrow');
+  body.classList.toggle('collapsed');
+  arrow.classList.toggle('collapsed');
+});
+
+// === 扩展数据 KV 行管理 ===
+function addExtensionRow(key, value) {
+  const container = document.getElementById('extensionsContainer');
+  const row = document.createElement('div');
+  row.className = 'ext-row';
+  row.innerHTML = `
+    <input class="ext-key" placeholder="Key (如 salesperson)" value="${escapeHtml(key || '')}">
+    <input class="ext-val" placeholder="Value (如 张三)" value="${escapeHtml(value || '')}">
+    <button class="ext-remove">✕</button>
+  `;
+  row.querySelector('.ext-remove').addEventListener('click', function() {
+    row.remove();
+  });
+  container.appendChild(row);
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+document.getElementById('addExtBtn').addEventListener('click', function() {
+  addExtensionRow();
+});
+
+// 初始化一行空 KV
+addExtensionRow();
+
+// 从 KV 行收集扩展数据
+function getExtensions() {
+  const rows = document.querySelectorAll('#extensionsContainer .ext-row');
+  const ext = {};
+  let hasAny = false;
+  rows.forEach(row => {
+    const key = row.querySelector('.ext-key').value.trim();
+    const val = row.querySelector('.ext-val').value.trim();
+    if (key) {
+      ext[key] = val;
+      hasAny = true;
+    }
+  });
+  return hasAny ? JSON.stringify(ext) : undefined;
+}
+
+// 构建 License JS 对象
 function buildLicense() {
   const featuresRaw = document.getElementById('features').value.trim();
   let features = [];
@@ -214,6 +340,7 @@ function buildLicense() {
     product: document.getElementById('product').value.trim(),
     machine_id: document.getElementById('machineID').value.trim(),
     features: features.length > 0 ? features : undefined,
+    extensions: getExtensions(),
   };
 }
 
