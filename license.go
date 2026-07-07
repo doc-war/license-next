@@ -129,7 +129,7 @@ func (c *Checker) Check(ctx context.Context) (*License, error) {
 	switch result {
 	case ResultOK:
 		// 本地缓存通过，后台异步刷新
-		c.maybeRefreshAsync(ctx)
+		c.maybeRefreshAsync()
 		return lic, nil
 
 	case ResultNeedRemote:
@@ -141,7 +141,7 @@ func (c *Checker) Check(ctx context.Context) (*License, error) {
 		if ferr != nil {
 			return nil, fmt.Errorf("licensenext: license需联网校验但连接失败: %w", ferr)
 		}
-		return c.validateAndPersist(ctx, ls)
+		return c.validateAndPersist(ls)
 
 	default:
 		if err != nil {
@@ -151,12 +151,33 @@ func (c *Checker) Check(ctx context.Context) (*License, error) {
 	}
 }
 
-// checkLocal 从本地缓存读取 LicenseSign，执行全部校验
-// 返回校验结果 + License（可能部分） + 错误
-// SimpleCheck 直接解码 CData 并还原 License，不涉及签名验证、联网、缓存。
-// 适用于客户端只需读取 License 内字段（昵称、邮箱、功能列表）做前台反显的场景。
-func (c *Checker) SimpleCheck(cdata string) (*License, error) {
-	return core.DecodeLicense(cdata, c.masterKey)
+// SimpleCheck 执行完全的本地校验，不解码缓存、不联网、不检查新鲜度。
+// 适用于不依赖远端刷新场景的离线校验。
+func (c *Checker) SimpleCheck() (*License, error) {
+	ls, err := core.LoadLicense(c.storeDir)
+	if err != nil {
+		return nil, fmt.Errorf("licensenext: 未找到本地license: %w", err)
+	}
+	if ls.Revoked {
+		return nil, errors.New("licensenext: license已被吊销")
+	}
+	if err := core.VerifySignature(c.pubKey, ls); err != nil {
+		return nil, err
+	}
+	lic, err := core.DecodeLicense(ls.CData, c.masterKey)
+	if err != nil {
+		return nil, err
+	}
+	if err := core.CheckProduct(lic, c.product); err != nil {
+		return nil, err
+	}
+	if err := core.CheckMachineID(lic, c.machineID); err != nil {
+		return nil, err
+	}
+	if err := core.CheckExpire(lic, c.now()); err != nil {
+		return nil, err
+	}
+	return lic, nil
 }
 
 func (c *Checker) checkLocal() (CheckResult, *License, error) {
@@ -201,7 +222,7 @@ func (c *Checker) checkLocal() (CheckResult, *License, error) {
 }
 
 // validateAndPersist 校验远程返回的 LicenseSign 并缓存到本地
-func (c *Checker) validateAndPersist(ctx context.Context, ls *LicenseSign) (*License, error) {
+func (c *Checker) validateAndPersist(ls *LicenseSign) (*License, error) {
 	if ls.Revoked {
 		return nil, errors.New("licensenext: license已被吊销")
 	}
@@ -230,7 +251,7 @@ func (c *Checker) validateAndPersist(ctx context.Context, ls *LicenseSign) (*Lic
 }
 
 // maybeRefreshAsync 在满足刷新间隔时，异步从远端拉取最新 License 并缓存
-func (c *Checker) maybeRefreshAsync(ctx context.Context) {
+func (c *Checker) maybeRefreshAsync() {
 	if c.remoteURL == "" {
 		return
 	}
@@ -243,6 +264,6 @@ func (c *Checker) maybeRefreshAsync(ctx context.Context) {
 		if err != nil {
 			return
 		}
-		_, _ = c.validateAndPersist(context.Background(), ls)
+		_, _ = c.validateAndPersist(ls)
 	}()
 }

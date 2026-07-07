@@ -610,18 +610,13 @@ func TestStore_SaveLicense_VerifyOnDisk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(dir, "license.lic"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	decoded, err := B64Decode(string(raw))
+raw, err := os.ReadFile(filepath.Join(dir, "license.lic"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var stored types.LicenseSign
-	if err := json.Unmarshal(decoded, &stored); err != nil {
+	if err := json.Unmarshal(raw, &stored); err != nil {
 		t.Fatal(err)
 	}
 	if stored.CData != ls.CData {

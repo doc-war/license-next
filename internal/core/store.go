@@ -21,18 +21,14 @@ func LoadLicense(dir string) (*types.LicenseSign, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := B64Decode(string(raw))
-	if err != nil {
-		return nil, err
-	}
 	var ls types.LicenseSign
-	if err := json.Unmarshal(data, &ls); err != nil {
+	if err := json.Unmarshal(raw, &ls); err != nil {
 		return nil, err
 	}
 	return &ls, nil
 }
 
-// SaveLicense 将 LicenseSign 写入本地缓存（先 JSON 序列化，再 Base64 编码）
+// SaveLicense 将 LicenseSign 写入本地缓存（JSON 格式）
 func SaveLicense(dir string, ls *types.LicenseSign) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -41,8 +37,7 @@ func SaveLicense(dir string, ls *types.LicenseSign) error {
 	if err != nil {
 		return err
 	}
-	encoded := B64Encode(raw)
-	return os.WriteFile(filepath.Join(dir, licenseFileName), []byte(encoded), 0600)
+	return os.WriteFile(filepath.Join(dir, licenseFileName), raw, 0600)
 }
 
 // LoadState 从本地读取状态。若文件不存在或损坏，返回空 State（不报错）

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>License CData 生成器 — license-next</title>
+<title>License 生成工具 — license-next</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; padding: 20px; }
@@ -21,30 +21,46 @@
   .btn-primary { background: #1a73e8; color: #fff; }
   .btn-primary:hover { background: #1557b0; }
   .btn-primary:disabled { background: #999; cursor: not-allowed; }
+  .btn-success { background: #2e7d32; color: #fff; }
+  .btn-success:hover { background: #1b5e20; }
   #result { margin-top: 16px; }
   #result textarea { background: #f8f9fa; min-height: 80px; }
   .copy-btn { font-size: 12px; padding: 4px 12px; background: #e8eaed; color: #333; margin-top: 4px; }
   .copy-btn:hover { background: #d0d4d9; }
-  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; background: #fff3e0; color: #e65100; }
-  .loading { color: #1a73e8; font-size: 13px; margin-top: 8px; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #fff3e0; color: #e65100; }
   #status { font-size: 12px; margin-bottom: 12px; padding: 6px 10px; border-radius: 4px; }
   .status-loading { background: #e3f2fd; color: #1565c0; }
   .status-ready { background: #e8f5e9; color: #2e7d32; }
   .status-error { background: #ffebee; color: #c62828; }
+  .mode-switch { display: flex; gap: 0; margin-bottom: 20px; border: 1px solid #d0d0d0; border-radius: 4px; overflow: hidden; }
+  .mode-switch button { flex: 1; padding: 10px; font-size: 13px; background: #f5f5f5; color: #666; border-radius: 0; }
+  .mode-switch button.active { background: #1a73e8; color: #fff; }
+  .mode-switch button:not(:last-child) { border-right: 1px solid #d0d0d0; }
+  .mode-section { display: none; }
+  .mode-section.active { display: block; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .detail-item { background: #f8f9fa; padding: 8px 10px; border-radius: 4px; font-size: 12px; }
+  .detail-item label { font-size: 11px; color: #888; }
+  .detail-item span { display: block; font-family: monospace; word-break: break-all; }
+  .detail-item.full { grid-column: 1 / -1; }
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>License CData 生成器</h1>
-  <p class="desc">输入 License 参数和 MasterKey，生成 CKD 编码的 CData 字符串。结果不经过网络，纯浏览器计算。</p>
+  <h1>License 生成工具</h1>
+  <p class="desc">输入 License 参数，生成 CData 或完整的 LicenseSign 文件。纯浏览器计算，数据不上传。</p>
 
   <div id="status" class="status-loading">⏳ 正在加载 WASM 模块...</div>
+
+  <div class="mode-switch">
+    <button id="modeCData" class="active">生成 CData</button>
+    <button id="modeLic">生成 license.lic</button>
+  </div>
 
   <div class="field">
     <label for="customer">客户标识（machine_id 匹配依据）</label>
     <input id="customer" value="acme-001" placeholder="e.g. acme-001">
   </div>
-
   <div class="row">
     <div class="field">
       <label for="customerNickname">客户昵称（前台反显）</label>
@@ -55,7 +71,6 @@
       <input id="customerEmail" value="admin@acme.com" placeholder="e.g. admin@acme.com">
     </div>
   </div>
-
   <div class="row">
     <div class="field">
       <label for="expireAt">过期时间</label>
@@ -66,34 +81,56 @@
       <input id="product" value="myapp" placeholder="e.g. myapp">
     </div>
   </div>
-
   <div class="field">
     <label for="machineID">机器码</label>
     <input id="machineID" placeholder="客户提供的机器码">
   </div>
-
   <div class="field">
     <label for="features">功能列表（JSON 数组，可选）</label>
     <input id="features" value='["premium","audit-log"]' placeholder='["premium"]'>
   </div>
-
   <div class="field">
     <label for="masterKey">MasterKey（32 字节字符串）</label>
     <input id="masterKey" placeholder="必填，输入 CKD MasterKey" required>
-    <div class="hint">CKD 派生密钥，客户端配置相同的 MasterKey 才能解码</div>
+    <div class="hint">客户端配置相同的 MasterKey 才能解码</div>
   </div>
 
-  <button id="generateBtn" class="btn-primary" disabled>生成 CData</button>
-
-  <div id="result" style="display:none;">
-    <div class="field">
-      <label id="resultLabel">CData 结果 <span id="methodTag"></span></label>
-      <textarea id="cdataOutput" readonly></textarea>
-      <button id="copyBtn" class="copy-btn">📋 复制</button>
+  <!-- 模式 1：CData -->
+  <div id="sectionCData" class="mode-section active">
+    <button id="generateCDataBtn" class="btn-primary" disabled>生成 CData</button>
+    <div id="resultCData" style="display:none;margin-top:16px;">
+      <div class="field">
+        <label>CData 结果 <span class="tag">CKD</span></label>
+        <textarea id="cdataOutput" readonly></textarea>
+        <button id="copyCDataBtn" class="copy-btn">📋 复制</button>
+      </div>
+      <div style="font-size:12px;color:#888;margin-top:8px;line-height:1.6;">
+        <p>将该字符串复制到 Worker KV，key 为对应的机器码。</p>
+        <p>客户端通过 <code>GET /v1/query?machine_id=xxx</code> 获取完整的 LicenseSign（含签名）。</p>
+      </div>
     </div>
-    <div style="font-size:12px;color:#888;margin-top:8px;line-height:1.6;">
-      <p>将该字符串复制到 Worker KV，key 为对应的机器码。</p>
-      <p>客户端通过 <code>GET /v1/query?machine_id=xxx</code> 获取完整的 LicenseSign（含签名）。</p>
+  </div>
+
+  <!-- 模式 2：license.lic -->
+  <div id="sectionLic" class="mode-section">
+    <div class="field">
+      <label for="privKeyFile">ECC 私钥文件（PEM 格式）</label>
+      <input id="privKeyFile" type="file" accept=".pem" style="padding:6px 10px;">
+      <div class="hint">选择私钥文件，用于 ECDSA 签名。文件不会被上传。</div>
+    </div>
+    <button id="generateLicBtn" class="btn-success" disabled>生成并下载 license.lic</button>
+    <div id="resultLic" style="display:none;margin-top:16px;">
+      <div class="detail-grid">
+        <div class="detail-item"><label>CData</label><span id="licCData">-</span></div>
+        <div class="detail-item"><label>Timestamp</label><span id="licTimestamp">-</span></div>
+        <div class="detail-item full"><label>Signature</label><span id="licSignature" style="font-size:11px;">-</span></div>
+        <div class="detail-item full"><label>license.lic（JSON）</label><span id="licOutput" style="font-size:11px;">-</span></div>
+      </div>
+      <button id="downloadLicBtn" class="copy-btn" style="margin-top:8px;">⬇️ 下载 license.lic</button>
+      <div style="font-size:12px;color:#888;margin-top:8px;line-height:1.6;">
+        <p>下载的 <code>{客户名}.license.lic</code> 重命名为 <code>license.lic</code> 放到客户端 <code>~/.license-next/&lt;product&gt;/</code> 目录下。</p>
+        <p>客户端调用 <code>SimpleCheck()</code> 或 <code>Check(ctx)</code> 自动读取。</p>
+      </div>
     </div>
   </div>
 </div>
@@ -102,6 +139,7 @@
 <script>
 const go = new Go();
 let wasmReady = false;
+let currentLicResult = null;
 
 WebAssembly.instantiateStreaming(fetch('issuer.wasm'), go.importObject)
   .then(result => {
@@ -109,30 +147,35 @@ WebAssembly.instantiateStreaming(fetch('issuer.wasm'), go.importObject)
     wasmReady = true;
     document.getElementById('status').className = 'status-ready';
     document.getElementById('status').textContent = '✅ WASM 已就绪';
-    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('generateCDataBtn').disabled = false;
+    document.getElementById('generateLicBtn').disabled = false;
   })
   .catch(err => {
     document.getElementById('status').className = 'status-error';
     document.getElementById('status').textContent = '❌ WASM 加载失败: ' + err.message;
   });
 
-document.getElementById('generateBtn').addEventListener('click', function() {
-  if (!wasmReady) return;
+// 模式切换
+document.getElementById('modeCData').addEventListener('click', function() {
+  this.classList.add('active');
+  document.getElementById('modeLic').classList.remove('active');
+  document.getElementById('sectionCData').classList.add('active');
+  document.getElementById('sectionLic').classList.remove('active');
+});
+document.getElementById('modeLic').addEventListener('click', function() {
+  this.classList.add('active');
+  document.getElementById('modeCData').classList.remove('active');
+  document.getElementById('sectionLic').classList.add('active');
+  document.getElementById('sectionCData').classList.remove('active');
+});
 
-  const masterKey = document.getElementById('masterKey').value.trim();
-  if (!masterKey) {
-    document.getElementById('cdataOutput').value = '错误: MasterKey 不能为空';
-    document.getElementById('result').style.display = 'block';
-    return;
-  }
-
+function buildLicense() {
   const featuresRaw = document.getElementById('features').value.trim();
   let features = [];
   if (featuresRaw) {
     try { features = JSON.parse(featuresRaw); } catch { features = [featuresRaw]; }
   }
-
-  const license = {
+  return {
     customer: document.getElementById('customer').value.trim(),
     customer_nickname: document.getElementById('customerNickname').value.trim() || undefined,
     customer_email: document.getElementById('customerEmail').value.trim() || undefined,
@@ -141,21 +184,66 @@ document.getElementById('generateBtn').addEventListener('click', function() {
     machine_id: document.getElementById('machineID').value.trim(),
     features: features.length > 0 ? features : undefined,
   };
+}
 
+// 模式 1：生成 CData
+document.getElementById('generateCDataBtn').addEventListener('click', function() {
+  if (!wasmReady) return;
+  const masterKey = document.getElementById('masterKey').value.trim();
+  if (!masterKey) { alert('MasterKey 不能为空'); return; }
+  const license = buildLicense();
   const cdata = encodeCData(license, masterKey);
-
-  document.getElementById('methodTag').innerHTML = '<span class="tag tag-ckd">CKD</span>';
   document.getElementById('cdataOutput').value = cdata;
-  document.getElementById('result').style.display = 'block';
+  document.getElementById('resultCData').style.display = 'block';
 });
 
-document.getElementById('copyBtn').addEventListener('click', function() {
-  const textarea = document.getElementById('cdataOutput');
-  textarea.select();
-  navigator.clipboard.writeText(textarea.value).then(() => {
+document.getElementById('copyCDataBtn').addEventListener('click', function() {
+  const ta = document.getElementById('cdataOutput');
+  ta.select();
+  navigator.clipboard.writeText(ta.value).then(() => {
     this.textContent = '✅ 已复制';
     setTimeout(() => { this.textContent = '📋 复制'; }, 2000);
   });
+});
+
+// 模式 2：生成 license.lic
+document.getElementById('generateLicBtn').addEventListener('click', function() {
+  if (!wasmReady) return;
+  const masterKey = document.getElementById('masterKey').value.trim();
+  if (!masterKey) { alert('MasterKey 不能为空'); return; }
+  const fileInput = document.getElementById('privKeyFile');
+  if (!fileInput.files.length) { alert('请选择私钥文件'); return; }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const privKeyPEM = e.target.result;
+    const license = buildLicense();
+    const resultStr = generateLicenseSign(license, masterKey, privKeyPEM);
+    const result = JSON.parse(resultStr);
+    if (!result.ok) {
+      alert('签发失败: ' + result.error);
+      return;
+    }
+    currentLicResult = result;
+    document.getElementById('licCData').textContent = result.cdata;
+    document.getElementById('licTimestamp').textContent = result.timestamp;
+    document.getElementById('licSignature').textContent = result.signature;
+    document.getElementById('licOutput').textContent = result.lic;
+    document.getElementById('resultLic').style.display = 'block';
+  };
+  reader.readAsText(fileInput.files[0]);
+});
+
+document.getElementById('downloadLicBtn').addEventListener('click', function() {
+  if (!currentLicResult) return;
+  const customer = document.getElementById('customer').value.trim() || 'license';
+  const blob = new Blob([currentLicResult.lic], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = customer + '.license.lic';
+  a.click();
+  URL.revokeObjectURL(url);
 });
 </script>
 </body>

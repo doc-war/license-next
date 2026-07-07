@@ -2,9 +2,35 @@
 
 轻量级客户端 License 验证框架，将 issuer（服务端签发）与 checker（客户端校验）分离。
 
-## 架构
+## 业务选择
+
+### 纯离线签名
+无法吊销license，但是不依赖服务端。
 
 ```
+                       │  客户提供机器码
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│           开发者（浏览器 / CLI）                          │
+│  official/issuer.html → WASM encodeCData → 下载lic文件   │
+└──────────────────────┬──────────────────────────────────┘
+                       │ 手动复制lic给客户
+                       ▼  
+                       │  客户配置到客户端
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│           客户端（Go 应用）                              │
+│  licensenext.New(cfg) → Check(ctx)                      │
+│    1. 本地缓存校验（签名有效性 / 机器码 / 过期 / 产品）     │
+│    2. 不校验签名新鲜度（SimpleCheck直接调用）                                    │ 
+└─────────────────────────────────────────────────────────┘
+```
+
+### 在线刷新签名
+依赖服务端，提供license自动刷新签名端点，可以通过配置revoked主动吊销license
+```
+                       │  客户提供机器码
+                       ▼
 ┌─────────────────────────────────────────────────────────┐
 │           开发者（浏览器 / CLI）                          │
 │  official/issuer.html → WASM encodeCData → CData 字符串  │
@@ -12,36 +38,29 @@
                        │ 手动复制
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│           Cloudflare Worker（开发者自行部署）               │
+│           Cloudflare Worker（开发者自行部署）             │
 │                                                         │
 │  KV: key=machine_id, value=CData                        │
 │                                                         │
 │  GET /v1/query?machine_id=xxx                           │
 │    1. 从 KV 读取 CData                                   │
-│    2. Web Crypto ECDSA P-256 签名                        │
+│    2. Web Crypto ECDSA P-256 签名                       │
 │    3. 返回 LicenseSign JSON                             │
 └──────────────────────┬──────────────────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│           客户端（Go 应用）                                │
+│           客户端（Go 应用）                              │
 │  licensenext.New(cfg) → Check(ctx)                      │
 │    1. 本地缓存校验（签名 / 机器码 / 过期 / 产品）          │
-│    2. 新鲜度过期 → GET /v1/query 联网刷新                 │
-│    3. 异步预刷新（3 天节流）                               │
+│    2. 新鲜度超窗 → GET /v1/query 联网自动刷新签名                 │
+│    3. 异步预刷新（3 天节流）                              │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ## 核心概念
 
-### CData — License 编码字符串
-
-CData 是 License 合同明文经过 CKD 协议编码后的字符串，使用 MasterKey 派生，可逆、无状态、不暴露明文。
-
-客户端配置相同的 MasterKey，通过 CKD.Parse 即可解码还原 License。
-
 ### License — 授权合同
-
 ```go
 type License struct {
     Customer         string    // 客户标识（机器码匹配依据）
@@ -53,6 +72,12 @@ type License struct {
     MachineID        string    // 绑定的机器码
 }
 ```
+
+### CData — License 编码字符串
+
+CData 是 License 原始合同明文经过 CKD 协议编码后的字符串，使用 MasterKey 派生，可逆、无状态、不暴露明文。
+客户端配置相同的 MasterKey，通过 CKD.Parse 即可解码还原 License。
+
 
 ### LicenseSign — 签名结构
 
@@ -75,6 +100,29 @@ type License struct {
 | `ResultNeedRemote` | 仅新鲜度过期，或本地无文件 | 联网校验，失败则拒绝启动 |
 | `ResultInvalid` | 签名/机器码/过期/吊销明确不匹配 | 直接拒绝启动，保留旧文件 |
 
+### SimpleCheck — 离线本地校验
+
+`SimpleCheck` 与 `Check` 的区别：
+
+| | `Check` | `SimpleCheck` |
+|---|---|---|
+| 签名 / 机器码 / 产品 / 过期 | ✅ | ✅ |
+| 本地缓存读取 | ✅ | ✅ |
+| 本地验签 | ✅ | ✅ |
+| 新鲜度窗口 | ✅ 超窗触发远端 | ❌ 不参与 |
+| 远端请求 | ✅ 自动 | ❌ 不触发 |
+| 调用方式 | `Check(ctx)` | `SimpleCheck()` |
+
+适用于无需联网刷新的离线场景：
+
+```go
+lic, err := checker.SimpleCheck()
+if err != nil {
+    log.Fatalf("license校验失败: %v", err)
+}
+log.Printf("欢迎 %s", lic.CustomerNickname)
+```
+
 ## 安装
 
 ```bash
@@ -94,7 +142,7 @@ openssl ec -in key-private.pem -pubout -out key-public.pem
 
 打开 `official/issuer.html`（浏览器），输入 License 参数和 MasterKey，点击生成。
 
-或者用 CLI：
+或者使用签发子包：
 
 ```go
 package main
@@ -170,7 +218,7 @@ log.Printf("可用功能: %v", lic.Features)
 
 ```
 ~/.license-next/{product}/
-  license.lic   # LicenseSign 的 base64url(JSON) 编码
+  license.lic   # LicenseSign 的 JSON 编码
   .state        # {"last_refresh_at": unix}
 ```
 
@@ -186,7 +234,6 @@ log.Printf("可用功能: %v", lic.Features)
 | `wasm/` | 浏览器 WASM 入口（`GOOS=js` 编译），暴露 `encodeCData` |
 | `worker/` | Cloudflare Worker 模板，Web Crypto 签名 + KV 查询 |
 | `issuer/` | Go 服务端签发包（ECDSA 签名 + CKD 派生） |
-| `cmd/wasm-issuer/` | wasip1 目标 WASM 编译（用于 Worker 内嵌签名） |
 | `examples/` | 集成示例（checker / issuer / 全流程） |
 
 ## 验证方式
