@@ -1,6 +1,6 @@
 // Package licensenext 是 license-next 的客户端入口包。
 // 使用方只需 import "github.com/doc-war/license-next"，
-// 通过 New(cfg) 创建 Checker，然后调用 Check(ctx) 完成校验。
+// 通过 New(cfg) 创建 Checker，然后调用 Check() 完成校验。
 package licensenext
 
 import (
@@ -36,16 +36,16 @@ const (
 
 // Checker 客户端校验器，持有公钥、机器码等运行时上下文
 type Checker struct {
-	product         string            // 产品名，用于 CheckProduct
-	machineID       string            // 本地机器码，在 New 时自动获取
-	pubKey          *ecdsa.PublicKey  // 解析后的 ECC 公钥
-	masterKey       string            // CKD MasterKey
-	remoteURL       string            // 远端校验接口地址（可选）
-	storeDir        string            // 本地缓存目录
-	freshWindow     time.Duration     // 签名新鲜度窗口
-	refreshInterval time.Duration     // 异步刷新间隔
-	httpTimeout     time.Duration     // HTTP 请求超时
-	now             func() time.Time  // 可注入的时间函数（便于测试）
+	product         string           // 产品名，用于 CheckProduct
+	machineID       string           // 本地机器码，在 New 时自动获取
+	pubKey          *ecdsa.PublicKey // 解析后的 ECC 公钥
+	masterKey       string           // CKD MasterKey
+	remoteURL       string           // 远端校验接口地址（可选）
+	storeDir        string           // 本地缓存目录
+	freshWindow     time.Duration    // 签名新鲜度窗口
+	refreshInterval time.Duration    // 异步刷新间隔
+	httpTimeout     time.Duration    // HTTP 请求超时
+	now             func() time.Time // 可注入的时间函数（便于测试）
 }
 
 // Config 客户端配置，传给 New 创建 Checker
@@ -123,7 +123,7 @@ func New(cfg Config) (*Checker, error) {
 
 // Check 执行 License 校验。优先本地缓存，必要时联网刷新。
 // 返回 License 指针和可公开的错误。
-func (c *Checker) Check(ctx context.Context) (*License, error) {
+func (c *Checker) Check() (*License, error) {
 	result, lic, err := c.checkLocal()
 
 	switch result {
@@ -137,7 +137,7 @@ func (c *Checker) Check(ctx context.Context) (*License, error) {
 		if c.remoteURL == "" {
 			return nil, errors.New("licensenext: license需联网校验但未配置RemoteURL")
 		}
-		ls, ferr := core.FetchLicense(ctx, c.remoteURL, c.machineID, c.httpTimeout)
+		ls, ferr := core.FetchLicense(context.Background(), c.remoteURL, c.machineID, c.httpTimeout)
 		if ferr != nil {
 			return nil, fmt.Errorf("licensenext: license需联网校验但连接失败: %w", ferr)
 		}

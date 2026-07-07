@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
 
@@ -30,7 +29,7 @@ func main() {
 		log.Fatalf("初始化失败: %v", err)
 	}
 
-	lic, err := checker.Check(context.Background())
+	lic, err := checker.Check()
 	if err != nil {
 		log.Fatalf("license校验失败: %v", err)
 	}

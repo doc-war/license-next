@@ -43,12 +43,17 @@
   .detail-item label { font-size: 11px; color: #888; }
   .detail-item span { display: block; font-family: monospace; word-break: break-all; }
   .detail-item.full { grid-column: 1 / -1; }
+  .label-hint { font-size: 11px; color: #888; font-weight: normal; }
+  .expire-options { display: inline-block; margin-left: 8px; }
+  .expire-options a { font-size: 11px; color: #999; cursor: pointer; margin-right: 6px; text-decoration: none; }
+  .expire-options a:hover { color: #1a73e8; }
+  .expire-options a.active { color: #1a73e8; font-weight: 600; }
 </style>
 </head>
 <body>
 <div class="container">
   <h1>License 生成工具</h1>
-  <p class="desc">输入 License 参数，生成 CData 或完整的 LicenseSign 文件。纯浏览器计算，数据不上传。</p>
+  <p class="desc">输入 License 参数，生成 CData 或完整的 LicenseSign 文件。纯浏览器计算，数据不上传。调用 <code>Check()</code> 或 <code>SimpleCheck()</code> 自动读取 license.lic。</p>
 
   <div id="status" class="status-loading">⏳ 正在加载 WASM 模块...</div>
 
@@ -58,39 +63,46 @@
   </div>
 
   <div class="field">
-    <label for="customer">客户标识（machine_id 匹配依据）</label>
+    <label for="customer">客户标识 <span class="label-hint">（前端反显）</span></label>
     <input id="customer" value="acme-001" placeholder="e.g. acme-001">
   </div>
   <div class="row">
     <div class="field">
-      <label for="customerNickname">客户昵称（前台反显）</label>
+      <label for="customerNickname">客户昵称<span class="label-hint">（前台反显）</span></label>
       <input id="customerNickname" value="Acme Corp" placeholder="e.g. Acme Corp">
     </div>
     <div class="field">
-      <label for="customerEmail">客户邮箱（前台反显）</label>
+      <label for="customerEmail">客户邮箱<span class="label-hint">（前台反显）</span></label>
       <input id="customerEmail" value="admin@acme.com" placeholder="e.g. admin@acme.com">
     </div>
   </div>
   <div class="row">
     <div class="field">
-      <label for="expireAt">过期时间</label>
-      <input id="expireAt" type="datetime-local" value="2030-12-31T23:59">
+      <label for="expireAt">
+        过期时间
+        <span class="expire-options">
+          <a data-months="2">2个月</a>
+          <a data-months="6" class="active">半年</a>
+          <a data-months="12">一年</a>
+        </span>
+      </label>
+      <input id="expireAt" type="datetime-local">
     </div>
     <div class="field">
-      <label for="product">产品名</label>
+      <label for="product">产品名 <span class="label-hint">（影响缓存唯一路径，建议保持唯一）</span></label>
       <input id="product" value="myapp" placeholder="e.g. myapp">
     </div>
   </div>
   <div class="field">
-    <label for="machineID">机器码</label>
+    <label for="machineID">机器码 <span class="label-hint">（machine_id 匹配依据）</span></label>
     <input id="machineID" placeholder="客户提供的机器码">
   </div>
   <div class="field">
-    <label for="features">功能列表（JSON 数组，可选）</label>
+    <label for="features">功能列表<span class="label-hint">（JSON 数组，可选）</span></label>
     <input id="features" value='["premium","audit-log"]' placeholder='["premium"]'>
   </div>
   <div class="field">
-    <label for="masterKey">MasterKey（32 字节字符串）</label>
+    <label for="masterKey">MasterKey<span class="label-hint">（32 字节字符串）</span></label>
     <input id="masterKey" placeholder="必填，输入 CKD MasterKey" required>
     <div class="hint">客户端配置相同的 MasterKey 才能解码</div>
   </div>
@@ -129,7 +141,7 @@
       <button id="downloadLicBtn" class="copy-btn" style="margin-top:8px;">⬇️ 下载 license.lic</button>
       <div style="font-size:12px;color:#888;margin-top:8px;line-height:1.6;">
         <p>下载的 <code>{客户名}.license.lic</code> 重命名为 <code>license.lic</code> 放到客户端 <code>~/.license-next/&lt;product&gt;/</code> 目录下。</p>
-        <p>客户端调用 <code>SimpleCheck()</code> 或 <code>Check(ctx)</code> 自动读取。</p>
+        <p>客户端调用 <code>SimpleCheck()</code> 或 <code>Check()</code> 自动读取。</p>
       </div>
     </div>
   </div>
@@ -140,6 +152,25 @@
 const go = new Go();
 let wasmReady = false;
 let currentLicResult = null;
+
+// 设置默认过期时间为半年后
+function setExpireByMonths(months) {
+  const d = new Date();
+  d.setMonth(d.getMonth() + months);
+  // 取整到小时
+  d.setMinutes(0, 0, 0);
+  document.getElementById('expireAt').value = d.toISOString().slice(0, 16);
+  document.querySelectorAll('.expire-options a').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.expire-options a[data-months="${months}"]`).classList.add('active');
+}
+setExpireByMonths(6);
+
+// 过期时间快捷选项
+document.querySelectorAll('.expire-options a').forEach(el => {
+  el.addEventListener('click', function() {
+    setExpireByMonths(parseInt(this.dataset.months));
+  });
+});
 
 WebAssembly.instantiateStreaming(fetch('issuer.wasm'), go.importObject)
   .then(result => {
