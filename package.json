@@ -3,6 +3,12 @@
   "private": true,
   "scripts": {
     "build": "node scripts/build.js",
-    "demo": "go run ./examples/full/"
-  }
+    "demo": "go run ./examples/full/",
+    "worker": "cd worker && wrangler deploy"
+  },
+  "remark":[
+    "npm run build负责全部编译测试",
+    "npm run demo负责运行examples/full/的全流程测试",
+    "npm run worker负责部署worker"
+  ]
 }

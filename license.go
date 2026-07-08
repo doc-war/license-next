@@ -92,13 +92,19 @@ func applyDefaults(cfg *Config) error {
 	return nil
 }
 
+// MachineID 获取当前机器的机器码（基于硬件信息加盐哈希）。
+// 开发者可将此值发给签发方，用于生成绑定该机器的 License。
+func MachineID() (string, error) {
+	return core.GetMachineID("license-next")
+}
+
 // New 创建 Checker 实例，自动获取机器码、解析公钥
 func New(cfg Config) (*Checker, error) {
 	if err := applyDefaults(&cfg); err != nil {
 		return nil, err
 	}
 
-	mid, err := core.GetMachineID("license-next")
+	mid, err := MachineID()
 	if err != nil {
 		return nil, fmt.Errorf("licensenext: 获取机器码失败: %w", err)
 	}

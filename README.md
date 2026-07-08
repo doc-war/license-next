@@ -103,6 +103,17 @@ CData 是 License 原始合同明文经过 CKD 协议编码后的字符串，使
 | `ResultNeedRemote` | 仅新鲜度过期，或本地无文件 | 联网校验，失败则拒绝启动 |
 | `ResultInvalid` | 签名/机器码/过期/吊销明确不匹配 | 直接拒绝启动，保留旧文件 |
 
+### MachineID — 获取本地机器码
+用于首次部署时获取机器码，发给开发者签发 License。
+
+```go
+mid, err := licensenext.MachineID()
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println("请将机器码发给管理员:", mid)
+```
+
 ### SimpleCheck — 离线本地校验
 
 `SimpleCheck` 与 `Check` 的区别：
